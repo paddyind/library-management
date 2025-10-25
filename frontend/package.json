@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
+    "axios": "^1.12.2",
     "next": "16.0.0",
     "postcss-import": "^16.1.1",
     "react": "19.2.0",
