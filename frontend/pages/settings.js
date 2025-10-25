@@ -1,7 +1,9 @@
 import Layout from '../src/components/layout/Layout.js';
 import { useState } from 'react';
+import Link from 'next/link';
+import withAdminAuth from '../src/hoc/withAdminAuth';
 
-export default function Settings() {
+function Settings() {
   const [activeTab, setActiveTab] = useState('general');
 
   const tabs = [
@@ -9,6 +11,8 @@ export default function Settings() {
     { id: 'notifications', name: 'Notifications', icon: '🔔' },
     { id: 'security', name: 'Security', icon: '🔒' },
     { id: 'integrations', name: 'Integrations', icon: '🔌' },
+    { id: 'user-management', name: 'User Management', icon: '👥' },
+    { id: 'group-management', name: 'Group Management', icon: '🏢' },
   ];
 
   return (
@@ -130,6 +134,22 @@ export default function Settings() {
               </div>
             </div>
           )}
+
+          {activeTab === 'user-management' && (
+            <div>
+              <Link href="/admin/users">
+                <a className="text-primary-600 hover:underline">Go to User Management</a>
+              </Link>
+            </div>
+          )}
+
+          {activeTab === 'group-management' && (
+            <div>
+              <Link href="/admin/groups">
+                <a className="text-primary-600 hover:underline">Go to Group Management</a>
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Coming Soon Banner */}
@@ -152,3 +172,5 @@ export default function Settings() {
     </Layout>
   );
 }
+
+export default withAdminAuth(Settings);

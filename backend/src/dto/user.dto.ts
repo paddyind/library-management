@@ -14,6 +14,10 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   role?: string;
+
+  @IsOptional()
+  @IsString()
+  subscription?: string;
 }
 
 export class UpdateUserDto {
@@ -37,6 +41,22 @@ export class UpdateUserDto {
   @IsString()
   @MinLength(6)
   password?: string;
+
+  @IsOptional()
+  notificationPreferences?: {
+    email?: boolean;
+    sms?: boolean;
+  };
+}
+
+export class UpdateProfileDto {
+  @IsOptional()
+  @IsString()
+  firstName?: string;
+
+  @IsOptional()
+  @IsString()
+  lastName?: string;
 
   @IsOptional()
   notificationPreferences?: {

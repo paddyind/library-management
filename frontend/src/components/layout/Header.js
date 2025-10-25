@@ -6,6 +6,18 @@ import { useRouter } from 'next/router';
 export default function Header({ onMenuButtonClick }) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const router = useRouter();
+
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const handleSearchSubmit = (e) => {
+    if (e.key === 'Enter') {
+      router.push(`/search?q=${searchQuery}`);
+    }
+  };
 
   const handleMenuClick = () => {
     if (onMenuButtonClick) {
@@ -52,6 +64,9 @@ export default function Header({ onMenuButtonClick }) {
                   type="text"
                   className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-secondary-500 focus:border-secondary-500 sm:text-sm transition-all duration-200"
                   placeholder="Search books, members..."
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  onKeyDown={handleSearchSubmit}
                 />
               </div>
             </div>
@@ -105,6 +120,16 @@ export default function Header({ onMenuButtonClick }) {
                           </div>
                         </div>
                       </div>
+                    </div>
+                    <div className="px-4 py-2 border-t border-gray-100 flex justify-between items-center">
+                      <Link href="/notifications">
+                        <a className="text-sm font-medium text-primary-600 hover:text-primary-500">
+                          All Notifications
+                        </a>
+                      </Link>
+                      <button className="text-sm font-medium text-gray-500 hover:text-gray-700">
+                        Clear
+                      </button>
                     </div>
                   </div>
                 </div>

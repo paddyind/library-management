@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from '../models/user.entity';
+import { User, UserRole } from '../models/user.entity';
 import { CreateUserDto, UpdateUserDto } from '../dto/user.dto';
 import * as bcrypt from 'bcrypt';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -14,11 +14,12 @@ export class UsersService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
+  async create(createUserDto: CreateUserDto, role: UserRole = UserRole.MEMBER): Promise<User> {
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
     const user = this.usersRepository.create({
       ...createUserDto,
       password: hashedPassword,
+      role,
     });
     const savedUser = await this.usersRepository.save(user);
     await this.notificationsService.sendMail(
@@ -29,7 +30,14 @@ export class UsersService {
     return savedUser;
   }
 
-  async findAll(): Promise<User[]> {
+  async findAll(query?: string): Promise<User[]> {
+    if (query) {
+      return this.usersRepository
+        .createQueryBuilder('user')
+        .where('user.name LIKE :query', { query: `%${query}%` })
+        .orWhere('user.email LIKE :query', { query: `%${query}%` })
+        .getMany();
+    }
     return this.usersRepository.find();
   }
 
