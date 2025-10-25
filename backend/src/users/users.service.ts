@@ -4,12 +4,14 @@ import { Repository } from 'typeorm';
 import { User } from '../models/user.entity';
 import { CreateUserDto, UpdateUserDto } from '../dto/user.dto';
 import * as bcrypt from 'bcrypt';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -18,7 +20,13 @@ export class UsersService {
       ...createUserDto,
       password: hashedPassword,
     });
-    return this.usersRepository.save(user);
+    const savedUser = await this.usersRepository.save(user);
+    await this.notificationsService.sendMail(
+      savedUser.email,
+      'Welcome to the Library Management System',
+      `Hi ${savedUser.name}, welcome to the Library Management System!`,
+    );
+    return savedUser;
   }
 
   async findAll(): Promise<User[]> {

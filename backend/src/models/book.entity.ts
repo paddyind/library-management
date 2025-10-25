@@ -1,6 +1,7 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne } from 'typeorm';
 import { User } from './user.entity';
 import { Loan } from './loan.entity';
+import { Reservation } from './reservation.entity';
 
 @Entity('books')
 export class Book {
@@ -33,6 +34,9 @@ export class Book {
 
   @OneToMany(() => Loan, loan => loan.book)
   loans: Loan[];
+
+  @OneToMany(() => Reservation, reservation => reservation.book)
+  reservations: Reservation[];
 
   @CreateDateColumn()
   createdAt: Date;

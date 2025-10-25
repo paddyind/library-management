@@ -32,20 +32,28 @@ The Library Management System is built as a modern web application with a clear 
 - **Types**: TypeScript type definitions
 
 ### 2. Backend (NestJS + TypeScript)
+- **Modules**:
+  - `Auth`: Handles user authentication and JWTs.
+  - `Users`: Manages user data.
+  - `Groups`: Manages user groups for role-based access.
+  - `Books`: Manages the book catalog.
+  - `Reservations`: Manages book reservations.
+  - `Profile`: Manages user profiles.
+  - `Notifications`: Handles sending notifications (e.g., email).
 - **Controllers**: HTTP request handlers
 - **Services**: Business logic implementation
 - **Models**: Data models and DTOs
-- **Guards**: Authentication and authorization
+- **Guards**: Authentication and authorization (including a `RolesGuard` for RBAC).
 - **Interceptors**: Request/Response transformation
 - **Middleware**: Request processing pipeline
 
 ### 3. Database (SQLite)
 - **Models**:
-  - Users
-  - Books
-  - Friends
-  - Loans
-  - Notifications
+  - `User`: Stores user information and relationships.
+  - `Group`: Stores user groups for RBAC.
+  - `Book`: Stores information about books in the library.
+  - `Loan`: Tracks books that are currently lent out.
+  - `Reservation`: Stores book reservations made by users.
 
 ### 4. Authentication
 - JWT-based authentication

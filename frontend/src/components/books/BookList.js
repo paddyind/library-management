@@ -1,17 +1,28 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 function BookList() {
-  const [books, setBooks] = useState([
-    {
-      id: 1,
-      title: 'The Great Gatsby',
-      author: 'F. Scott Fitzgerald',
-      isbn: '978-0743273565',
-      status: 'available',
-      copies: 2
-    },
-    // Add more sample books here
-  ]);
+  const [books, setBooks] = useState([]);
+
+  useEffect(() => {
+    const fetchBooks = async () => {
+      const response = await axios.get('/api/books');
+      setBooks(response.data);
+    };
+    fetchBooks();
+  }, []);
+
+  const handleReserve = async (bookId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post('/api/reservations', { bookId }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      alert('Book reserved successfully');
+    } catch (err) {
+      alert('Failed to reserve book');
+    }
+  };
 
   return (
     <div className="flex flex-col">
@@ -73,6 +84,13 @@ function BookList() {
                       {book.copies}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={() => handleReserve(book.id)}
+                        disabled={book.status !== 'available'}
+                        className="text-indigo-600 hover:text-indigo-900 mr-4 disabled:opacity-50"
+                      >
+                        Reserve
+                      </button>
                       <button className="text-indigo-600 hover:text-indigo-900 mr-4">
                         Edit
                       </button>

@@ -6,7 +6,15 @@ const nextConfig = {
     serverActions: {
       allowedForwardedHosts: ['localhost', '127.0.0.1']
     }
-  }
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://backend:3001/api/:path*',
+      },
+    ]
+  },
 }
 
 module.exports = nextConfig
