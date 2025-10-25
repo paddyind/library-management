@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useRouter } from 'next/router';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -7,6 +8,7 @@ function BookList() {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchBooks = async () => {
@@ -29,7 +31,7 @@ function BookList() {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        alert('Please login to reserve books');
+        router.push('/login');
         return;
       }
       

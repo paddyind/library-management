@@ -1,6 +1,7 @@
 import Layout from '../src/components/layout/Layout.js';
+import withAdminAuth from '../src/hoc/withAdminAuth';
 
-export default function Reports() {
+function Reports() {
   return (
     <Layout>
       <div className="space-y-6">
@@ -75,3 +76,5 @@ export default function Reports() {
     </Layout>
   );
 }
+
+export default withAdminAuth(Reports);

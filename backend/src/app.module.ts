@@ -8,6 +8,8 @@ import { GroupsModule } from './groups/groups.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { ProfileModule } from './profile/profile.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { TransactionsModule } from './transactions/transactions.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { NotificationsModule } from './notifications/notifications.module';
     ReservationsModule,
     ProfileModule,
     NotificationsModule,
+    SubscriptionsModule,
+    TransactionsModule,
   ],
 })
 export class AppModule {}

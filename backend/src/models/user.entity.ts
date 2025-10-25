@@ -3,6 +3,12 @@ import { Book } from './book.entity';
 import { Loan } from './loan.entity';
 import { Group } from './group.entity';
 import { Reservation } from './reservation.entity';
+import { Subscription } from './subscription.entity';
+
+export enum UserRole {
+  ADMIN = 'Admin',
+  MEMBER = 'Member',
+}
 
 @Entity('users')
 export class User {
@@ -27,6 +33,13 @@ export class User {
   @Column()
   password: string;
 
+  @Column({
+    type: 'simple-enum',
+    enum: UserRole,
+    default: UserRole.MEMBER,
+  })
+  role: UserRole;
+
   @OneToMany(() => Book, book => book.owner)
   books: Book[];
 
@@ -39,6 +52,9 @@ export class User {
 
   @OneToMany(() => Reservation, reservation => reservation.user)
   reservations: Reservation[];
+
+  @OneToMany(() => Subscription, subscription => subscription.user)
+  subscriptions: Subscription[];
 
   @CreateDateColumn()
   createdAt: Date;

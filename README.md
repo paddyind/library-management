@@ -4,12 +4,15 @@ This is a full-stack library management system built with a Next.js frontend and
 
 ## Features
 
-*   **User Management:** Admins can manage users and groups.
+*   **User Management:** Admins can manage users and groups, with support for multiple Admins.
 *   **Book Management:** Admins can manage the book catalog.
-*   **Role-Based Access Control:** Users can be assigned to groups with different permissions (e.g., "Admin", "Subscriber").
-*   **Book Reservations:** Users can reserve books from the catalog.
+*   **Role-Based Access Control:** Users can be assigned to groups with different permissions (e.g., "Admin", "Member").
+*   **User Registration:** New users can register with a free trial and choose from tiered subscription plans (Bronze, Silver, Gold).
+*   **Book Reservations and Loans:** Users can reserve and borrow books.
+*   **Transactions:** Users can view their own transaction history, while Admins can view all transactions.
+*   **Global Search:** All users can search for books, and Admins can also search for members.
 *   **User Profiles:** Users can manage their own profiles and notification preferences.
-*   **Notifications:** Users receive email notifications for important events like registration and book reservations.
+*   **Notifications:** Users receive notifications for important events, with a dedicated page to view all notifications.
 
 ## Tech Stack
 

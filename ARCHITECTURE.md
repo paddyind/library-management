@@ -40,6 +40,9 @@ The Library Management System is built as a modern web application with a clear 
   - `Reservations`: Manages book reservations.
   - `Profile`: Manages user profiles.
   - `Notifications`: Handles sending notifications (e.g., email).
+  - `Transactions`: Manages user transactions, including loans and reservations.
+  - `Search`: Handles global search functionality.
+  - `Subscriptions`: Manages user subscriptions and free trials.
 - **Controllers**: HTTP request handlers
 - **Services**: Business logic implementation
 - **Models**: Data models and DTOs
@@ -54,6 +57,7 @@ The Library Management System is built as a modern web application with a clear 
   - `Book`: Stores information about books in the library.
   - `Loan`: Tracks books that are currently lent out.
   - `Reservation`: Stores book reservations made by users.
+  - `Subscription`: Stores user subscription information.
 
 ### 4. Authentication
 - JWT-based authentication

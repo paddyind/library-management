@@ -19,11 +19,20 @@ export class BooksService {
     return this.booksRepository.save(book);
   }
 
-  async findAll(): Promise<Book[]> {
-    return this.booksRepository.find({
-      relations: ['owner'],
-      order: { createdAt: 'DESC' },
-    });
+  async findAll(query?: string): Promise<Book[]> {
+    const queryBuilder = this.booksRepository.createQueryBuilder('book');
+
+    if (query) {
+      queryBuilder
+        .where('book.title LIKE :query', { query: `%${query}%` })
+        .orWhere('book.author LIKE :query', { query: `%${query}%` })
+        .orWhere('book.isbn LIKE :query', { query: `%${query}%` });
+    }
+
+    return queryBuilder
+      .leftJoinAndSelect('book.owner', 'owner')
+      .orderBy('book.createdAt', 'DESC')
+      .getMany();
   }
 
   async findOne(id: string): Promise<Book> {
@@ -48,14 +57,5 @@ export class BooksService {
   async remove(id: string): Promise<void> {
     const book = await this.findOne(id);
     await this.booksRepository.remove(book);
-  }
-
-  async search(query: string): Promise<Book[]> {
-    return this.booksRepository
-      .createQueryBuilder('book')
-      .where('book.title LIKE :query', { query: `%${query}%` })
-      .orWhere('book.author LIKE :query', { query: `%${query}%` })
-      .orWhere('book.isbn LIKE :query', { query: `%${query}%` })
-      .getMany();
   }
 }
