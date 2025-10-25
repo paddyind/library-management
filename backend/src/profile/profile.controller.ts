@@ -3,7 +3,7 @@ import { ProfileService } from './profile.service';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { User } from '../models/user.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { Request } from 'express';
+import type { Request } from 'express';
 
 @Controller('profile')
 @UseGuards(JwtAuthGuard)

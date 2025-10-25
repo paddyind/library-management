@@ -1,13 +1,26 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 function BookList() {
   const [books, setBooks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchBooks = async () => {
-      const response = await axios.get('/api/books');
-      setBooks(response.data);
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await axios.get(`${API_BASE_URL}/books`);
+        setBooks(response.data);
+      } catch (err) {
+        console.error('Error fetching books:', err);
+        setError(err.response?.data?.message || 'Failed to load books. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
     };
     fetchBooks();
   }, []);
@@ -15,14 +28,37 @@ function BookList() {
   const handleReserve = async (bookId) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.post('/api/reservations', { bookId }, {
+      if (!token) {
+        alert('Please login to reserve books');
+        return;
+      }
+      
+      await axios.post(`${API_BASE_URL}/reservations`, { bookId }, {
         headers: { Authorization: `Bearer ${token}` },
       });
       alert('Book reserved successfully');
     } catch (err) {
-      alert('Failed to reserve book');
+      console.error('Error reserving book:', err);
+      alert(err.response?.data?.message || 'Failed to reserve book');
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <strong className="font-bold">Error!</strong>
+        <span className="block sm:inline"> {error}</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col">

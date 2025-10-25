@@ -22,6 +22,14 @@ export class UpdateUserDto {
   name?: string;
 
   @IsOptional()
+  @IsString()
+  firstName?: string;
+
+  @IsOptional()
+  @IsString()
+  lastName?: string;
+
+  @IsOptional()
   @IsEmail()
   email?: string;
 
@@ -29,6 +37,12 @@ export class UpdateUserDto {
   @IsString()
   @MinLength(6)
   password?: string;
+
+  @IsOptional()
+  notificationPreferences?: {
+    email?: boolean;
+    sms?: boolean;
+  };
 }
 
 export class LoginDto {

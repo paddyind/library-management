@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Reservation } from '../models/reservation.entity';
@@ -18,8 +18,17 @@ export class ReservationsService {
     return this.reservationRepository.find({ relations: ['user', 'book'] });
   }
 
-  findOne(id: number): Promise<Reservation> {
-    return this.reservationRepository.findOne({ where: { id }, relations: ['user', 'book'] });
+  async findOne(id: number): Promise<Reservation> {
+    const reservation = await this.reservationRepository.findOne({ 
+      where: { id }, 
+      relations: ['user', 'book'] 
+    });
+    
+    if (!reservation) {
+      throw new NotFoundException(`Reservation with ID "${id}" not found`);
+    }
+    
+    return reservation;
   }
 
   async create(createReservationDto: CreateReservationDto, user: User): Promise<Reservation> {

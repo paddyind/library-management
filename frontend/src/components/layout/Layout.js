@@ -10,8 +10,8 @@ function Layout({ children }) {
       {/* Sidebar component with smooth transition */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* Main content */}
-      <div className="flex flex-col w-0 flex-1 overflow-hidden">
+      {/* Main content - add left margin on desktop to account for fixed sidebar */}
+      <div className="flex flex-col flex-1 overflow-hidden md:ml-64">
         <Header onMenuButtonClick={() => setSidebarOpen(true)} />
 
         <main className="flex-1 relative z-0 overflow-y-auto focus:outline-none">

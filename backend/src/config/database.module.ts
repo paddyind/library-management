@@ -9,7 +9,7 @@ import { join } from 'path';
     TypeOrmModule.forRoot({
       type: 'sqlite',
       database: process.env.SQLITE_PATH || 'data/library.sqlite',
-      entities: [join(__dirname, '**', '*.entity.{ts,js}')],
+      entities: [join(__dirname, '..', 'models', '*.entity.{ts,js}')],
       synchronize: process.env.NODE_ENV === 'development', // Only in development!
       logging: process.env.NODE_ENV === 'development',
     }),

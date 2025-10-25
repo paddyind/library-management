@@ -3,7 +3,7 @@ import { ReservationsService } from './reservations.service';
 import { CreateReservationDto } from '../dto/create-reservation.dto';
 import { Reservation } from '../models/reservation.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { Request } from 'express';
+import type { Request } from 'express';
 
 @Controller('reservations')
 @UseGuards(JwtAuthGuard)

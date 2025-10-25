@@ -10,6 +10,9 @@ export class User {
   id: string;
 
   @Column({ nullable: true })
+  name: string;
+
+  @Column({ nullable: true })
   firstName: string;
 
   @Column({ nullable: true })
