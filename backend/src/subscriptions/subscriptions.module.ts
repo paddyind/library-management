@@ -9,5 +9,6 @@ import { Subscription } from '../models/subscription.entity';
   imports: [UsersModule, TypeOrmModule.forFeature([Subscription])],
   controllers: [SubscriptionsController],
   providers: [SubscriptionsService],
+  exports: [SubscriptionsService],
 })
 export class SubscriptionsModule {}

@@ -6,7 +6,7 @@ import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../models/user.entity';
 
 import { Req } from '@nestjs/common';
-import { Request } from 'express';
+import type { Request } from 'express';
 import { User } from 'src/models/user.entity';
 
 @Controller('search')

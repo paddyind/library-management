@@ -1,7 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { User } from './user.entity';
 
-@Entity()
+@Entity('groups')
 export class Group {
   @PrimaryGeneratedColumn()
   id: number;
@@ -9,6 +9,18 @@ export class Group {
   @Column({ unique: true })
   name: string;
 
+  @Column({ nullable: true })
+  description: string;
+
+  @Column('simple-json', { nullable: true })
+  permissions: string[];
+
   @ManyToMany(() => User, user => user.groups)
   users: User[];
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

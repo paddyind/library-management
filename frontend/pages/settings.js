@@ -1,19 +1,27 @@
 import Layout from '../src/components/layout/Layout.js';
 import { useState } from 'react';
 import Link from 'next/link';
-import withAdminAuth from '../src/hoc/withAdminAuth';
+import { useAuth } from '../src/contexts/AuthContext';
 
 function Settings() {
   const [activeTab, setActiveTab] = useState('general');
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
 
   const tabs = [
     { id: 'general', name: 'General', icon: '⚙️' },
     { id: 'notifications', name: 'Notifications', icon: '🔔' },
     { id: 'security', name: 'Security', icon: '🔒' },
     { id: 'integrations', name: 'Integrations', icon: '🔌' },
-    { id: 'user-management', name: 'User Management', icon: '👥' },
-    { id: 'group-management', name: 'Group Management', icon: '🏢' },
   ];
+
+  // Only show admin tabs if user is admin
+  if (isAdmin) {
+    tabs.push(
+      { id: 'user-management', name: 'User Management', icon: '👥' },
+      { id: 'group-management', name: 'Group Management', icon: '🏢' }
+    );
+  }
 
   return (
     <Layout>
@@ -137,16 +145,16 @@ function Settings() {
 
           {activeTab === 'user-management' && (
             <div>
-              <Link href="/admin/users">
-                <a className="text-primary-600 hover:underline">Go to User Management</a>
+              <Link href="/admin/users" className="text-primary-600 hover:underline">
+                Go to User Management
               </Link>
             </div>
           )}
 
           {activeTab === 'group-management' && (
             <div>
-              <Link href="/admin/groups">
-                <a className="text-primary-600 hover:underline">Go to Group Management</a>
+              <Link href="/admin/groups" className="text-primary-600 hover:underline">
+                Go to Group Management
               </Link>
             </div>
           )}
@@ -173,4 +181,4 @@ function Settings() {
   );
 }
 
-export default withAdminAuth(Settings);
+export default Settings;

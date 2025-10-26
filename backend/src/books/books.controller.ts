@@ -11,10 +11,7 @@ export class BooksController {
 
   @Get()
   findAll(@Query('search') search?: string): Promise<Book[]> {
-    if (search) {
-      return this.booksService.search(search);
-    }
-    return this.booksService.findAll();
+    return this.booksService.findAll(search);
   }
 
   @Get(':id')

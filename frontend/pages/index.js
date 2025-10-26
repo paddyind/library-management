@@ -1,140 +1,287 @@
-import { useState } from 'react';
-import Layout from '../src/components/layout/Layout.js';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import Link from 'next/link';
+import axios from 'axios';
 
-export default function Dashboard() {
-  const [stats] = useState({
-    totalBooks: 150,
-    availableBooks: 120,
-    totalMembers: 50,
-    activeLoans: 30,
-    overdueBooks: 5,
-    popularCategories: [
-      { name: 'Fiction', count: 45 },
-      { name: 'Technology', count: 30 },
-      { name: 'Science', count: 25 },
-    ]
-  });
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
-  const [recentTransactions] = useState([
-    {
-      id: 1,
-      type: 'checkout',
-      book: 'The Great Gatsby',
-      member: 'John Doe',
-      date: '2025-10-23'
-    },
-    // Add more sample transactions
-  ]);
+export default function WelcomePage() {
+  const [books, setBooks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredBooks, setFilteredBooks] = useState([]);
+  const [activeTab, setActiveTab] = useState('all'); // 'all', 'top', 'recent'
+  const router = useRouter();
+
+  useEffect(() => {
+    fetchBooks();
+  }, []);
+
+  useEffect(() => {
+    if (searchQuery) {
+      const filtered = books.filter(book =>
+        book.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        book.author?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        book.isbn?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredBooks(filtered);
+    } else {
+      setFilteredBooks(books);
+    }
+  }, [searchQuery, books]);
+
+  const fetchBooks = async () => {
+    try {
+      setLoading(true);
+      // Try to fetch books without authentication (public endpoint)
+      const response = await axios.get(`${API_BASE_URL}/books`);
+      setBooks(response.data);
+      setFilteredBooks(response.data);
+    } catch (err) {
+      console.error('Failed to fetch books:', err);
+      // Show sample books if API fails
+      const sampleBooks = [
+        { id: 1, title: 'The Great Gatsby', author: 'F. Scott Fitzgerald', isbn: '9780743273565', available: true },
+        { id: 2, title: 'To Kill a Mockingbird', author: 'Harper Lee', isbn: '9780061120084', available: true },
+        { id: 3, title: '1984', author: 'George Orwell', isbn: '9780451524935', available: false },
+        { id: 4, title: 'Pride and Prejudice', author: 'Jane Austen', isbn: '9780141439518', available: true },
+        { id: 5, title: 'The Catcher in the Rye', author: 'J.D. Salinger', isbn: '9780316769174', available: true },
+        { id: 6, title: 'The Hobbit', author: 'J.R.R. Tolkien', isbn: '9780547928227', available: true },
+        { id: 7, title: 'Harry Potter and the Sorcerer\'s Stone', author: 'J.K. Rowling', isbn: '9780590353427', available: false },
+        { id: 8, title: 'The Da Vinci Code', author: 'Dan Brown', isbn: '9780307474278', available: true },
+      ];
+      setBooks(sampleBooks);
+      setFilteredBooks(sampleBooks);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const getDisplayBooks = () => {
+    if (searchQuery) {
+      return filteredBooks;
+    }
+    
+    switch (activeTab) {
+      case 'top':
+        // Sort by availability and show top books
+        return [...filteredBooks].sort((a, b) => b.available - a.available).slice(0, 8);
+      case 'recent':
+        // Show most recent books (reverse order)
+        return [...filteredBooks].reverse().slice(0, 8);
+      default:
+        return filteredBooks;
+    }
+  };
+
+  const displayBooks = getDisplayBooks();
 
   return (
-    <Layout>
-      <div className="py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-          
-          {/* Stats Grid */}
-          <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Total Books</dt>
-                      <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">{stats.totalBooks}</div>
-                      </dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Total Members</dt>
-                      <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">{stats.totalMembers}</div>
-                      </dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Active Loans</dt>
-                      <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">{stats.activeLoans}</div>
-                      </dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {/* Hero Section */}
+      <header className="bg-white shadow-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <Link href="/" className="flex items-center space-x-3">
+              <svg className="h-10 w-10 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900">Library Management System</h1>
+            </Link>
+            <div className="flex items-center space-x-2 md:space-x-4">
+              <Link
+                href="/help"
+                className="px-3 md:px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 transition-colors"
+              >
+                Help
+              </Link>
+              <Link
+                href="/login"
+                className="px-3 md:px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors shadow-sm"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/register"
+                className="px-3 md:px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors shadow-sm"
+              >
+                Register
+              </Link>
             </div>
           </div>
+        </div>
+      </header>
 
-          {/* Recent Activity */}
-          <h2 className="mt-8 text-lg font-medium text-gray-900">Recent Activity</h2>
-          <div className="mt-3 bg-white shadow overflow-hidden sm:rounded-md">
-            <ul role="list" className="divide-y divide-gray-200">
-              {recentTransactions.map((transaction) => (
-                <li key={transaction.id}>
-                  <div className="px-4 py-4 sm:px-6">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-indigo-600 truncate">
-                        {transaction.book}
-                      </p>
-                      <div className="ml-2 flex-shrink-0 flex">
-                        <p className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          transaction.type === 'checkout' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-blue-100 text-blue-800'
-                        }`}>
-                          {transaction.type}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-2 sm:flex sm:justify-between">
-                      <div className="sm:flex">
-                        <p className="flex items-center text-sm text-gray-500">
-                          {transaction.member}
-                        </p>
-                      </div>
-                      <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                        <p>
-                          {transaction.date}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+      {/* Welcome Banner */}
+      <div className="bg-gradient-to-r from-primary-600 to-purple-600 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+          <h2 className="text-4xl font-extrabold sm:text-5xl">
+            Welcome to Our Library
+          </h2>
+          <p className="mt-4 text-xl text-primary-100">
+            Discover, borrow, and enjoy thousands of books from our collection
+          </p>
+          
+          {/* Search Bar */}
+          <div className="mt-8 max-w-xl mx-auto">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search books by title, author, or ISBN..."
+                value={searchQuery}
+                onChange={handleSearch}
+                className="w-full px-6 py-4 text-gray-900 placeholder-gray-500 rounded-full border-0 focus:outline-none focus:ring-4 focus:ring-white focus:ring-opacity-50 shadow-lg text-lg"
+              />
+              <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                <svg className="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </Layout>
+
+      {/* Books Catalog */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+          <h3 className="text-2xl font-bold text-gray-900">
+            {searchQuery ? `Search Results (${displayBooks.length})` : 
+             activeTab === 'top' ? 'Top Books' :
+             activeTab === 'recent' ? 'Recently Added' :
+             'Browse All Books'}
+          </h3>
+
+          {!searchQuery && (
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'all'
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All Books
+              </button>
+              <button
+                onClick={() => setActiveTab('top')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'top'
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                ⭐ Top Books
+              </button>
+              <button
+                onClick={() => setActiveTab('recent')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'recent'
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                🆕 Recent
+              </button>
+            </div>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+          </div>
+        ) : displayBooks.length === 0 ? (
+          <div className="text-center py-12">
+            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No books found</h3>
+            <p className="mt-1 text-sm text-gray-500">Try adjusting your search query.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {displayBooks.map((book) => (
+              <div
+                key={book.id}
+                className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 overflow-hidden"
+              >
+                <div className="h-48 bg-gradient-to-br from-primary-400 to-purple-500 flex items-center justify-center">
+                  <svg className="h-20 w-20 text-white opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                </div>
+                <div className="p-6">
+                  <h4 className="text-lg font-semibold text-gray-900 line-clamp-2 mb-2">
+                    {book.title}
+                  </h4>
+                  <p className="text-sm text-gray-600 mb-1">
+                    <span className="font-medium">Author:</span> {book.author || 'Unknown'}
+                  </p>
+                  <p className="text-xs text-gray-500 mb-4">
+                    ISBN: {book.isbn || 'N/A'}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      book.available
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {book.available ? 'Available' : 'Checked Out'}
+                    </span>
+                    <Link
+                      href="/login"
+                      className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                    >
+                      Borrow →
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Call to Action */}
+        {!loading && displayBooks.length > 0 && (
+          <div className="mt-12 text-center bg-white rounded-lg shadow-md p-8">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">
+              Want to borrow a book?
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Sign in to your account or register to start borrowing books from our library.
+            </p>
+            <div className="flex justify-center space-x-4">
+              <Link
+                href="/login"
+                className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/register"
+                className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+              >
+                Register
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <footer className="bg-gray-800 text-white mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center">
+            <p className="text-gray-400">© 2025 Library Management System. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserRole } from '../models/user.entity';
@@ -15,19 +15,33 @@ export class UsersService {
   ) {}
 
   async create(createUserDto: CreateUserDto, role: UserRole = UserRole.MEMBER): Promise<User> {
+    // Check if user with this email already exists
+    const existingUser = await this.findByEmail(createUserDto.email);
+    if (existingUser) {
+      throw new ConflictException('A user with this email already exists');
+    }
+
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
     const user = this.usersRepository.create({
       ...createUserDto,
       password: hashedPassword,
       role,
     });
-    const savedUser = await this.usersRepository.save(user);
-    await this.notificationsService.sendMail(
-      savedUser.email,
-      'Welcome to the Library Management System',
-      `Hi ${savedUser.name}, welcome to the Library Management System!`,
-    );
-    return savedUser;
+    
+    try {
+      const savedUser = await this.usersRepository.save(user);
+      await this.notificationsService.sendMail(
+        savedUser.email,
+        'Welcome to the Library Management System',
+        `Hi ${savedUser.name}, welcome to the Library Management System!`,
+      );
+      return savedUser;
+    } catch (error) {
+      if (error.code === 'SQLITE_CONSTRAINT' || error.message?.includes('UNIQUE constraint')) {
+        throw new ConflictException('A user with this email already exists');
+      }
+      throw error;
+    }
   }
 
   async findAll(query?: string): Promise<User[]> {

@@ -38,7 +38,8 @@ export class AuthService {
 
   async register(createUserDto: CreateUserDto) {
     const user = await this.usersService.create(createUserDto);
-    await this.subscriptionsService.create(user.id, createUserDto.subscription);
+    const subscriptionTier = createUserDto.subscription || 'FREE';
+    await this.subscriptionsService.create(user, subscriptionTier as any, 0);
     return user;
   }
 }

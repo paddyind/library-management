@@ -1,5 +1,4 @@
 import Layout from '../src/components/layout/Layout.js';
-import withAdminAuth from '../src/hoc/withAdminAuth';
 
 function Reports() {
   return (
@@ -77,4 +76,5 @@ function Reports() {
   );
 }
 
-export default withAdminAuth(Reports);
+export default Reports;
+

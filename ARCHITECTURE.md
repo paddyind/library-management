@@ -33,31 +33,34 @@ The Library Management System is built as a modern web application with a clear 
 
 ### 2. Backend (NestJS + TypeScript)
 - **Modules**:
-  - `Auth`: Handles user authentication and JWTs.
-  - `Users`: Manages user data.
-  - `Groups`: Manages user groups for role-based access.
-  - `Books`: Manages the book catalog.
-  - `Reservations`: Manages book reservations.
-  - `Profile`: Manages user profiles.
-  - `Notifications`: Handles sending notifications (e.g., email).
-  - `Transactions`: Manages user transactions, including loans and reservations.
-  - `Search`: Handles global search functionality.
-  - `Subscriptions`: Manages user subscriptions and free trials.
-- **Controllers**: HTTP request handlers
-- **Services**: Business logic implementation
-- **Models**: Data models and DTOs
-- **Guards**: Authentication and authorization (including a `RolesGuard` for RBAC).
+  - `Auth`: Handles user authentication and JWTs
+  - `Users`: Manages user data and CRUD operations
+  - `Groups`: Manages user groups with role-based access and member management
+  - `Books`: Manages the book catalog with public access
+  - `Loans`: Manages book borrowing and returns
+  - `Reservations`: Manages book reservations
+  - `Profile`: Manages user profiles
+  - `Notifications`: Handles notification CRUD and email notifications
+  - `Transactions`: Manages user transactions, including loans and reservations
+  - `Search`: Handles global search functionality
+  - `Subscriptions`: Manages user subscriptions and free trials
+- **Controllers**: HTTP request handlers with proper validation
+- **Services**: Business logic implementation with error handling
+- **Models**: TypeORM entities with relationships
+- **DTOs**: Data transfer objects with validation decorators
+- **Guards**: Authentication (JwtAuthGuard) and authorization (RolesGuard)
 - **Interceptors**: Request/Response transformation
 - **Middleware**: Request processing pipeline
 
 ### 3. Database (SQLite)
 - **Models**:
-  - `User`: Stores user information and relationships.
-  - `Group`: Stores user groups for RBAC.
-  - `Book`: Stores information about books in the library.
-  - `Loan`: Tracks books that are currently lent out.
-  - `Reservation`: Stores book reservations made by users.
-  - `Subscription`: Stores user subscription information.
+  - `User`: User information, authentication, and relationships
+  - `Group`: User groups for RBAC with permissions array
+  - `Book`: Book catalog with status and availability
+  - `Loan`: Active book loans with due dates
+  - `Reservation`: Book reservations queue
+  - `Subscription`: User subscription tiers and trials
+  - `Notification`: User notifications with types and read status
 
 ### 4. Authentication
 - JWT-based authentication

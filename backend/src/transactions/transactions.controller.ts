@@ -2,9 +2,9 @@ import { Controller, Get, UseGuards, Req } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { UserRole } from '../models/user.entity';
+import { UserRole, User } from '../models/user.entity';
 import { TransactionsService } from './transactions.service';
-import { Request } from 'express';
+import type { Request } from 'express';
 
 @Controller('transactions')
 @UseGuards(JwtAuthGuard)
@@ -20,6 +20,7 @@ export class TransactionsController {
 
   @Get('my-transactions')
   findMyTransactions(@Req() req: Request) {
-    return this.transactionsService.findUserTransactions(req.user.id);
+    const user = req.user as User;
+    return this.transactionsService.findUserTransactions(user.id);
   }
 }

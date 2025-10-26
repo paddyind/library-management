@@ -2,8 +2,9 @@ import { useState } from 'react';
 import Layout from '../src/components/layout/Layout.js';
 import MemberList from '../src/components/members/MemberList.js';
 import MemberForm from '../src/components/members/MemberForm.js';
+import { withAdminAuth } from '../src/components/withAuth';
 
-export default function MembersPage() {
+function MembersPage() {
   const [isAddingMember, setIsAddingMember] = useState(false);
 
   const handleAddMember = (memberData) => {
@@ -37,3 +38,5 @@ export default function MembersPage() {
     </Layout>
   );
 }
+
+export default withAdminAuth(MembersPage);
