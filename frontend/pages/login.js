@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../src/contexts/AuthContext';
 import axios from 'axios';
 import Link from 'next/link';
+import AuthLayout from '../src/components/AuthLayout';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -39,24 +40,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <div className="flex justify-center">
-            <div className="h-16 w-16 bg-primary-600 rounded-full flex items-center justify-center">
-              <svg className="h-10 w-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-            </div>
-          </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Library Management System
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Sign in to your account
-          </p>
-        </div>
-        
+    <AuthLayout title="Sign in to your account">
+      <>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
@@ -164,21 +149,45 @@ export default function Login() {
           </div>
         </form>
 
+        <div className="mt-4 bg-yellow-50 border-l-4 border-yellow-400 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.21 3.03-1.742 3.03H4.42c-1.532 0-2.492-1.696-1.742-3.03l5.58-9.92zM10 13a1 1 0 110-2 1 1 0 010 2zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-yellow-700">
+                Demo Credentials
+              </p>
+              <p className="mt-1 text-sm text-yellow-700">
+                Email: <span className="font-medium">admin@example.com</span><br/>
+                Password: <span className="font-medium">password</span>
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="mt-6">
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-300" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-gray-50 text-gray-500">Demo Credentials</span>
+              <span className="px-2 bg-white text-gray-500">Or</span>
             </div>
           </div>
-          <div className="mt-3 text-center text-xs text-gray-500 space-y-1">
-            <p><strong>Admin:</strong> admin@library.com / password</p>
-            <p><strong>User:</strong> user@library.com / password</p>
+
+          <div className="mt-6">
+            <Link
+              href="/"
+              className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+              Browse books without account
+            </Link>
           </div>
         </div>
-      </div>
-    </div>
+      </>
+    </AuthLayout>
   );
 }
