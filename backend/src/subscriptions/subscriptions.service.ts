@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Subscription, SubscriptionTier } from '../models/subscription.entity';
-import { User } from '../models/user.entity';
+import { Member } from '../models/member.entity';
+import { subscriptionPlans } from '../config/subscription-plans';
 
 @Injectable()
 export class SubscriptionsService {
@@ -11,18 +12,20 @@ export class SubscriptionsService {
     private subscriptionsRepository: Repository<Subscription>,
   ) {}
 
-  async create(user: User, tier: SubscriptionTier, depositAmount: number): Promise<Subscription> {
+  async create(member: Member, tier: SubscriptionTier): Promise<Subscription> {
+    const plan = subscriptionPlans[tier];
     const startDate = new Date();
     const endDate = new Date();
-    endDate.setMonth(endDate.getMonth() + 1); // 1-month free trial
+    endDate.setDate(endDate.getDate() + plan.lendingPeriod);
 
     const subscription = this.subscriptionsRepository.create({
-      user,
+      member,
       tier,
       startDate,
       endDate,
       isActive: true,
-      depositAmount,
+      price: plan.price,
+      lendingLimit: plan.lendingLimit,
     });
 
     return this.subscriptionsRepository.save(subscription);

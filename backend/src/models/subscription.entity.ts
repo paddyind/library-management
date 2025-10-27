@@ -13,8 +13,8 @@ export class Subscription {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => User, user => user.subscriptions)
-  user: User;
+  @ManyToOne(() => Member, member => member.subscriptions)
+  member: Member;
 
   @Column({
     type: 'simple-enum',
@@ -32,7 +32,10 @@ export class Subscription {
   isActive: boolean;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0.0 })
-  depositAmount: number;
+  price: number;
+
+  @Column()
+  lendingLimit: number;
 
   @CreateDateColumn()
   createdAt: Date;
