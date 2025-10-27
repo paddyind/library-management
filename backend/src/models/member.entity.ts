@@ -4,14 +4,16 @@ import { Loan } from './loan.entity';
 import { Group } from './group.entity';
 import { Reservation } from './reservation.entity';
 import { Subscription } from './subscription.entity';
+import { BookRequest } from './book-request.entity';
+import { AuthenticationProvider } from './authentication-provider.entity';
 
-export enum UserRole {
+export enum MemberRole {
   ADMIN = 'Admin',
   MEMBER = 'Member',
 }
 
-@Entity('users')
-export class User {
+@Entity('members')
+export class Member {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -35,10 +37,10 @@ export class User {
 
   @Column({
     type: 'simple-enum',
-    enum: UserRole,
-    default: UserRole.MEMBER,
+    enum: MemberRole,
+    default: MemberRole.MEMBER,
   })
-  role: UserRole;
+  role: MemberRole;
 
   @OneToMany(() => Book, book => book.owner)
   books: Book[];
@@ -46,15 +48,21 @@ export class User {
   @OneToMany(() => Loan, loan => loan.borrower)
   borrowedBooks: Loan[];
 
-  @ManyToMany(() => Group, group => group.users)
+  @ManyToMany(() => Group, group => group.members)
   @JoinTable()
   groups: Group[];
 
-  @OneToMany(() => Reservation, reservation => reservation.user)
+  @OneToMany(() => Reservation, reservation => reservation.member)
   reservations: Reservation[];
 
-  @OneToMany(() => Subscription, subscription => subscription.user)
+  @OneToMany(() => Subscription, subscription => subscription.member)
   subscriptions: Subscription[];
+
+  @OneToMany(() => BookRequest, bookRequest => bookRequest.member)
+  bookRequests: BookRequest[];
+
+  @OneToMany(() => AuthenticationProvider, provider => provider.member)
+  authenticationProviders: AuthenticationProvider[];
 
   @CreateDateColumn()
   createdAt: Date;

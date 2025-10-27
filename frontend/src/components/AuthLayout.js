@@ -2,8 +2,8 @@ import Link from 'next/link';
 
 export default function AuthLayout({ title, children }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-lg shadow-md">
         <div>
           <div className="flex justify-center">
             <div className="h-16 w-16 bg-primary-600 rounded-full flex items-center justify-center">

@@ -62,6 +62,13 @@ export default function SearchPage() {
             <div className="text-center py-12">
               <p className="text-gray-500 text-lg">No results found for "{q}"</p>
               <p className="text-gray-400 mt-2">Try searching with different keywords</p>
+              <div className="mt-6">
+                <Link href="/request-book">
+                  <a className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700">
+                    Request a Book
+                  </a>
+                </Link>
+              </div>
             </div>
           )}
 
