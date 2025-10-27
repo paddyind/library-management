@@ -2,11 +2,11 @@
 
 A modern, full-stack library management system with **anonymous book browsing** and comprehensive administrative features. Built with Next.js, NestJS, and Docker.
 
-[![Version](https://img.shields.io/badge/version-1.0.5-blue.svg)](https://github.com/paddyind/library-management)
+[![Version](https://img.shields.io/badge/version-1.0.6-blue.svg)](https://github.com/paddyind/library-management)
 [![Frontend](https://img.shields.io/badge/frontend-100%25_complete-success.svg)](https://github.com/paddyind/library-management)
 [![Backend](https://img.shields.io/badge/backend-100%25_complete-success.svg)](https://github.com/paddyind/library-management)
 
-> **Latest Release (v1.0.5)**: Enhanced book browsing with search/filter, "My Current Books" section, complete authentication integration, and bug fixes. See [CHANGELOG.md](CHANGELOG.md) for details.
+> **Latest Release (v1.0.6)**: Added "Request a Book" feature, updated membership plans, and refactored documentation. See [CHANGELOG.md](CHANGELELOG.md) for details.
 
 ---
 
@@ -26,12 +26,14 @@ A modern, full-stack library management system with **anonymous book browsing** 
 - 🔔 **Notifications** - Stay updated with due dates and library news
 - ⚙️ **Profile Management** - Update your information and preferences
 - 📊 **Transaction History** - View your complete borrowing history
+- 🙏 **Request a Book** - Request a book if it's not in the catalog
 
 ### For Administrators
-- 👥 **User Management** - Complete CRUD operations for user accounts
+- 👥 **Member Management** - Complete CRUD operations for member accounts
 - 🏷️ **Group Management** - Create groups and assign permissions
 - 📚 **Book Catalog** - Manage the entire book inventory
 - 📈 **Analytics** - View library-wide statistics and reports
+- 🙏 **Manage Book Requests** - Approve or reject member book requests
 - 🔐 **Role-Based Access** - Fine-grained permission control
 
 ---
@@ -66,13 +68,13 @@ A modern, full-stack library management system with **anonymous book browsing** 
 
 ### Test Credentials
 ```
-Admin User:
+Admin Member:
   Email: admin@library.com
   Password: password
   Role: Admin
 
-Regular User:
-  Email: user@library.com
+Regular Member:
+  Email: member@library.com
   Password: password
   Role: Member
 ```
@@ -110,20 +112,21 @@ Regular User:
 - ✅ Protected routes with role-based access
 - ✅ Persistent login sessions
 
-### User Interface
+### Member Interface
 - ✅ **Welcome Page** - Public landing page with book catalog
-- ✅ **Dashboard** - Personalized user dashboard
+- ✅ **Dashboard** - Personalized member dashboard
 - ✅ **Profile** - Complete profile management
 - ✅ **Transactions** - Borrowing history and status
 - ✅ **Notifications** - Real-time notification system UI
-- ✅ **Settings** - User preferences and configuration
+- ✅ **Settings** - Member preferences and configuration
 - ✅ **Reports** - Statistical analysis and insights
 
 ### Admin Features
-- ✅ **User Management** - Full CRUD interface
+- ✅ **Member Management** - Full CRUD interface
 - ✅ **Group Management** - Permission-based groups
 - ✅ **Book Management** - Catalog administration
 - ✅ **Statistics** - Library-wide analytics
+- ✅ **Book Request Management** - Approve/reject book requests
 
 ---
 
@@ -135,7 +138,7 @@ library-management/
 ├── frontend/               # Next.js frontend application
 │   ├── pages/             # Page components
 │   │   ├── index.js       # Public welcome page
-│   │   ├── dashboard.js   # User dashboard
+│   │   ├── dashboard.js   # Member dashboard
 │   │   ├── login.js       # Authentication
 │   │   ├── profile.js     # Profile management
 │   │   └── admin/         # Admin pages
@@ -147,7 +150,7 @@ library-management/
 ├── backend/               # NestJS backend application
 │   ├── src/
 │   │   ├── auth/          # Authentication module
-│   │   ├── users/         # User management
+│   │   ├── members/       # Member management
 │   │   ├── books/         # Book management
 │   │   ├── models/        # TypeORM entities
 │   │   └── dto/           # Data transfer objects
@@ -198,22 +201,23 @@ docker compose up -d --build
 
 ### Frontend: 100% Complete ✅
 - [x] Welcome page (anonymous access)
-- [x] User dashboard
+- [x] Member dashboard
 - [x] Authentication (login/register/logout)
 - [x] Profile management
 - [x] Transactions page
 - [x] Notifications UI
-- [x] User management UI
+- [x] Member management UI
 - [x] Group management UI
 - [x] Settings page
 - [x] Reports page
 - [x] Responsive design
 - [x] Error handling
 - [x] Loading states
+- [x] Book Request Form
 
 ### Backend: 100% Complete ✅
 - [x] Authentication API (JWT, login, register)
-- [x] User CRUD API
+- [x] Member CRUD API
 - [x] Books API (public access + CRUD)
 - [x] Transactions API
 - [x] Notifications API (full CRUD + 8 endpoints)
@@ -221,6 +225,7 @@ docker compose up -d --build
 - [x] Profile API
 - [x] Database seed with demo data
 - [x] Email service integration
+- [x] Book Request API
 
 ---
 
@@ -256,7 +261,7 @@ docker compose restart
 ```
 
 **Issue: "Invalid credentials" on login**
-- Use demo credentials: `admin@library.com` / `password` or `user@library.com` / `password`
+- Use demo credentials: `admin@library.com` / `password` or `member@library.com` / `password`
 - Or register a new account
 - Check backend is running: `docker compose logs backend`
 
@@ -266,7 +271,7 @@ docker compose restart
 
 **Issue: Members page accessible without login**
 - Fixed in v1.0.5 with `withAdminAuth` HOC
-- Only admin users can access /members page now
+- Only admin members can access /members page now
 
 ### Getting Help
 - Check [CHANGELOG.md](CHANGELOG.md) for known issues and fixes
@@ -279,37 +284,42 @@ docker compose restart
 
 ### Public Endpoints (No Auth)
 ```
-POST /api/auth/register   - Register new user
-POST /api/auth/login      - Login user
+POST /api/auth/register   - Register new member
+POST /api/auth/login      - Login member
 GET  /api/books           - List books (with fallback)
+GET  /api/subscriptions/plans - Get subscription plans
 ```
 
 ### Protected Endpoints (Auth Required)
 ```
-GET    /api/users/profile         - Get user profile
-PUT    /api/users/profile         - Update profile
-GET    /api/transactions/my       - Get user transactions
+GET    /api/members/profile         - Get member profile
+PUT    /api/members/profile         - Update profile
+GET    /api/transactions/my       - Get member transactions
 POST   /api/books/:id/borrow      - Borrow book
 POST   /api/books/:id/return      - Return book
+POST   /api/book-requests         - Create a book request
+GET    /api/book-requests/mine    - Get my book requests
 ```
 
 ### Admin Endpoints (Admin Role Required)
 ```
-GET    /api/users                 - List all users
-POST   /api/users                 - Create user
-PUT    /api/users/:id             - Update user
-DELETE /api/users/:id             - Delete user
+GET    /api/members                 - List all members
+POST   /api/members                 - Create member
+PUT    /api/members/:id             - Update member
+DELETE /api/members/:id             - Delete member
 GET    /api/groups                - List all groups
 POST   /api/groups                - Create group
 PUT    /api/groups/:id            - Update group
 DELETE /api/groups/:id            - Delete group
 POST   /api/groups/:id/members    - Add member to group
-DELETE /api/groups/:id/members/:userId - Remove member
+DELETE /api/groups/:id/members/:memberId - Remove member
+GET    /api/book-requests         - Get all book requests
+PATCH  /api/book-requests/:id     - Update a book request status
 ```
 
 ### Notifications Endpoints (Authenticated)
 ```
-GET    /api/notifications         - Get user notifications
+GET    /api/notifications         - Get member notifications
 GET    /api/notifications/unread-count - Get unread count
 POST   /api/notifications/:id/mark-read - Mark as read
 POST   /api/notifications/mark-all-read - Mark all as read
@@ -329,7 +339,7 @@ docker compose exec backend npm run seed
 ```
 
 **Seeded Data Includes:**
-- 2 Demo Users (admin & member)
+- 2 Demo Members (admin & member)
 - 3 Groups (Administrators, Librarians, Members)
 - 12 Classic Books (with covers and various statuses)
 - 4 Sample Notifications
@@ -386,7 +396,6 @@ For support, please open an issue in the GitHub repository or contact the mainta
 
 ---
 
-**Version**: 1.0.5  
+**Version**: 1.0.6
 **Last Updated**: October 26, 2025  
 **Status**: Production Ready ✅ | Frontend Complete ✅ | Backend Complete ✅
-

@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.6] - 2025-10-26
+
+### Added
+- **"Request a Book" Feature**:
+  - Members can now request a book if it's not found in the search results.
+  - A new "BookRequest" entity has been added to the backend.
+  - New API endpoints have been created to handle book requests.
+  - Admins can view and manage all book requests from a new admin panel.
+  - Members can view their own book requests and their status.
+- **Updated Membership Plans**:
+  - Membership tiers have been updated with new pricing, trial periods, and book lending limits.
+  - A new `subscription-plans.ts` configuration file has been added to the backend.
+  - The registration page now dynamically displays the updated membership plans.
+
+### Changed
+- **Data Model Documentation**:
+  - Refactored all instances of "User" to "Member" in the `ARCHITECTURE.md`, `CHANGELOG.md`, and `README.md` files.
+  - Updated the `ARCHITECTURE.md` file to include the new `BookRequest` entity.
+
 ## [v1.0.5 FINAL] - 2025-10-26
 
 ### 🎉 Major Feature Release - Enhanced Book Browsing & Search
@@ -27,12 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **📚 Enhanced Books Page** - Complete overhaul with premium features:
   
   **My Current Books Section** (Top of page):
-  - Displays all currently borrowed books for logged-in users
+  - Displays all currently borrowed books for logged-in members
   - Shows book title, author, and due date
   - Quick "Return" button for each book
   - Real-time count display
   - Beautiful gradient background (blue to indigo)
-  - Only visible when user has active borrows
+  - Only visible when member has active borrows
   
   **Search & Filter Section**:
   - Real-time search bar (title, author, ISBN)
@@ -50,14 +69,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Hover effects and smooth transitions
   - Empty state when no books match filters
   
-  **User Experience Features**:
-  - "Borrow Book" button for available books (logged-in users)
-  - "Login to Borrow" button for non-authenticated users
+  **Member Experience Features**:
+  - "Borrow Book" button for available books (logged-in members)
+  - "Login to Borrow" button for non-authenticated members
   - "Return" button in My Current Books section
   - Automatic redirect to login with return URL
   - Real-time UI updates after borrow/return actions
   - Loading spinners during API calls
-  - Error messages with user-friendly text
+  - Error messages with member-friendly text
 
 - **🔍 Enhanced Search Page** - Complete implementation:
   - Full-text search across book catalog
@@ -74,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Complete rewrite from 40 lines to 280+ lines
   - Integrated search, filter, and transaction management
   - Added real-time state management
-  - Implemented comprehensive user flows
+  - Implemented comprehensive member flows
   - Better error handling and loading states
 
 - **Search Page** (`/frontend/pages/search.js`):
@@ -100,7 +119,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### API Integration
 New API endpoints utilized:
 - `GET /api/books` - Fetch all books
-- `GET /api/transactions/my` - Fetch user's active transactions
+- `GET /api/transactions/my` - Fetch member's active transactions
 - `POST /api/transactions` - Borrow a book
 - `PATCH /api/transactions/:id/return` - Return a book
 
@@ -116,15 +135,15 @@ New API endpoints utilized:
 - ✅ Authentication integration: Working
 - ✅ Responsive design: Verified
 
-### User Experience
-**For Logged-In Users**:
+### Member Experience
+**For Logged-In Members**:
 1. See "My Current Books" section at top
 2. Quick return with one click
 3. Search and filter available books
 4. Borrow books instantly
 5. Real-time updates
 
-**For Non-Logged Users**:
+**For Non-Logged Members**:
 1. Browse all books with search/filter
 2. "Login to Borrow" button available
 3. Redirect to login preserves return URL
@@ -189,8 +208,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Members Page Security**: Protected members page with admin-only access
   - Applied `withAdminAuth` HOC to ensure only admins can access
-  - Unauthenticated users are redirected to login with return URL
-  - Non-admin authenticated users are redirected to dashboard
+  - Unauthenticated members are redirected to login with return URL
+  - Non-admin authenticated members are redirected to dashboard
   - Prevents unauthorized access to member management features
 
 ### Changed
@@ -249,7 +268,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ✅ Members page now requires authentication
 - ✅ Members page restricted to admin role only
 - ✅ Proper redirect flow with return URLs
-- ✅ Prevents unauthorized access to sensitive user data
+- ✅ Prevents unauthorized access to sensitive member data
 
 ### Known Issues
 - ⚠️ Email service not configured (logs show SMTP connection refused)
@@ -265,7 +284,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Authentication Protection**: Created `withAuth` HOC for protecting routes that require authentication
-  - Automatically redirects unauthenticated users to login page with return URL
+  - Automatically redirects unauthenticated members to login page with return URL
   - Preserves the intended destination URL for redirect after login  
   - Shows loading spinner while checking authentication status
   - Supports role-based access control (Admin/Member)
@@ -301,16 +320,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated in: Registration page, Help page
   
 - **Notifications Page**: Added comprehensive authentication handling
-  - Checks if user is authenticated before loading data
+  - Checks if member is authenticated before loading data
   - Redirects to login with return URL if not authenticated
   - Shows proper error handling for 401 unauthorized responses
-  - Prevents showing 401 errors to unauthenticated users
-  - Improved user experience with loading states
+  - Prevents showing 401 errors to unauthenticated members
+  - Improved member experience with loading states
 
 ### Fixed
 - Fixed forgot password 404 error - page now exists and fully functional
 - Fixed authentication flow - protected pages now redirect to login instead of showing 401 errors
-- Improved redirect flow with return URLs for better user experience
+- Improved redirect flow with return URLs for better member experience
 
 ### Technical Details
 
@@ -346,12 +365,12 @@ export default withMemberAuth(MyMemberPage);
 ```
 
 **Redirect Flow:**
-- User tries to access `/notifications` without login
+- Member tries to access `/notifications` without login
 - Redirected to `/login?redirect=/notifications`
-- After successful login, user is sent back to `/notifications`
+- After successful login, member is sent back to `/notifications`
 
 ### Pending Tasks for v1.0.5
-- [ ] **Login Button Investigation**: User reports not seeing sign-in button (code exists, may be rendering/CSS issue)
+- [ ] **Login Button Investigation**: Member reports not seeing sign-in button (code exists, may be rendering/CSS issue)
 - [ ] **Apply withAuth to All Protected Pages**:
   - [ ] /dashboard
   - [ ] /profile  
@@ -374,28 +393,28 @@ export default withMemberAuth(MyMemberPage);
 
 ### Added
 - **Notifications API** (8 endpoints):
-  - Full CRUD operations for user notifications
+  - Full CRUD operations for member notifications
   - Mark as read/unread functionality
   - Unread count tracking
   - Notification types: info, success, warning, error, overdue, due_soon, reservation_ready
-  - User-specific data isolation with JWT authentication
+  - Member-specific data isolation with JWT authentication
   
 - **Groups API** (8 endpoints):
-  - Full CRUD operations for user groups
+  - Full CRUD operations for member groups
   - Enhanced with description and permissions array
   - Member management (add/remove members)
   - Role-based access control (Admin only for mutations)
   - Group member listing
   
 - **Database Seed Script**:
-  - 2 demo users (admin@library.com, user@library.com)
+  - 2 demo members (admin@library.com, member@library.com)
   - 3 groups with proper permissions (Administrators, Librarians, Members)
   - 12 classic books with cover images and various statuses
   - 4 sample notifications of different types
   - Run with: `docker compose exec backend npm run seed`
 
 - **New Backend Entities**:
-  - Notification entity with relationships to User
+  - Notification entity with relationships to Member
   - Enhanced Group entity with description, permissions, timestamps
 
 - **New Backend DTOs**:
@@ -407,13 +426,13 @@ export default withMemberAuth(MyMemberPage);
   - Solution: Updated seed script to match app configuration
   - Result: All APIs now work correctly with seeded data
 
-- **Authentication Testing**: Login endpoint now properly authenticates seeded users
+- **Authentication Testing**: Login endpoint now properly authenticates seeded members
 
 ### Enhanced
 - **NotificationsService**: Complete rewrite from email-only to full CRUD
   - Added helper methods for common notification types
   - Graceful email handling (optional)
-  - Proper error handling and user isolation
+  - Proper error handling and member isolation
 
 - **GroupsService**: Enhanced with member management
   - Name uniqueness validation
@@ -441,8 +460,8 @@ export default withMemberAuth(MyMemberPage);
 - **Profile Page**: Fixed API URL (3001 → 4000), complete redesign with Layout
 - **Header Component**: Fixed profile dropdown - now has working navigation links
 - **Header Component**: Added logout functionality that clears auth and redirects
-- **Header Component**: Displays actual user name from context
-- **Notifications Page**: Gracefully handles missing backend API with user-friendly error
+- **Header Component**: Displays actual member name from context
+- **Notifications Page**: Gracefully handles missing backend API with member-friendly error
 - **All API Calls**: Now properly use authentication tokens from AuthContext
 
 ### Added
@@ -461,10 +480,10 @@ export default withMemberAuth(MyMemberPage);
   - "Sign out" button with logout functionality
 
 ### Changed
-- **AuthContext**: Now manages user state globally across the app
-- **Login Flow**: User context immediately available after successful login
+- **AuthContext**: Now manages member state globally across the app
+- **Login Flow**: Member context immediately available after successful login
 - **Profile Access**: Profile page now accessible via header dropdown
-- **Settings Access**: Dynamic tab rendering - admin tabs only show for admin users
+- **Settings Access**: Dynamic tab rendering - admin tabs only show for admin members
 
 ### Documentation
 - **Added**: `BACKEND_TODO.md` - Comprehensive guide for backend API implementation
@@ -473,7 +492,7 @@ export default withMemberAuth(MyMemberPage);
 ### Known Issues
 - Backend notifications API not implemented (frontend handles gracefully)
 - Backend groups API not implemented (frontend UI ready)
-- Some user management endpoints may need verification
+- Some member management endpoints may need verification
 
 ---
 
@@ -492,18 +511,18 @@ export default withMemberAuth(MyMemberPage);
 - **All Link Components**: Removed nested `<a>` tags to comply with Next.js 13+ requirements
 
 ### Added
-- **User Management**: Full CRUD interface at `/admin/users`
-  - Create, read, update, delete users
-  - Role assignment (User/Admin)
-  - User listing with search and filters
-  - Modal-based form for adding/editing users
+- **Member Management**: Full CRUD interface at `/admin/members`
+  - Create, read, update, delete members
+  - Role assignment (Member/Admin)
+  - Member listing with search and filters
+  - Modal-based form for adding/editing members
 - **Group Management**: Full CRUD interface at `/admin/groups`
   - Create, read, update, delete groups
   - Permission assignment system
   - Group listing with member counts
   - Modal-based form for adding/editing groups
 - **API Configuration**: Centralized API_BASE_URL using environment variables
-- **Better Error Messages**: User-friendly error displays across all pages
+- **Better Error Messages**: Member-friendly error displays across all pages
 
 ### Security
 - Protected admin pages with `withAdminAuth` HOC
@@ -540,19 +559,19 @@ export default withMemberAuth(MyMemberPage);
 ## [0.4.0] - 2025-10-25
 
 ### Added
-- User, Member, and Group management in Settings.
+- Member, and Group management in Settings.
 - Multi-admin support.
-- User profile editing and viewing for all users.
-- Anonymous user book browsing with login/register prompt.
-- User registration flow with free trial, deposit, and tiered subscriptions (Bronze, Silver, Gold).
+- Member profile editing and viewing for all members.
+- Anonymous member book browsing with login/register prompt.
+- Member registration flow with free trial, deposit, and tiered subscriptions (Bronze, Silver, Gold).
 - `Transactions` module to view book loans and reservations.
-- Global search for books (all users) and members (Admins only).
+- Global search for books (all members) and members (Admins only).
 - "All Notifications" link and "My Notifications" page.
 - "Clear" button for notifications.
 
 ### Enhanced
 - Access control to restrict Settings and Reports pages to Admins.
-- Transactions page now shows user-specific transactions for members and all transactions for Admins.
+- Transactions page now shows member-specific transactions for members and all transactions for Admins.
 
 ## [0.3.0] - 2025-10-25
 
@@ -569,9 +588,9 @@ export default withMemberAuth(MyMemberPage);
 ### Fixed
 - All TypeScript compilation errors (11 total)
 - Import type issues for Express Request in controllers
-- DTO compatibility between UpdateProfileDto and UpdateUserDto
+- DTO compatibility between UpdateProfileDto and UpdateMemberDto
 - Null return type handling in services with NotFoundException
-- Missing 'name' property in User entity
+- Missing 'name' property in Member entity
 - Module dependency issues (NotificationsModule imports)
 - Compression import namespace issue
 - TypeORM entity registration path for proper entity discovery
@@ -581,9 +600,9 @@ export default withMemberAuth(MyMemberPage);
 ### Enhanced
 - Frontend BookList component with loading states and error handling
 - API integration with proper base URL configuration
-- Error boundaries and user-friendly error messages
+- Error boundaries and member-friendly error messages
 - Authentication checks for protected operations
-- Sidebar navigation UX - removed duplicate admin user display
+- Sidebar navigation UX - removed duplicate admin member display
 
 ### Security
 - Implemented Helmet.js for XSS, CSP, HSTS, and frame protection
@@ -594,11 +613,11 @@ export default withMemberAuth(MyMemberPage);
 ## [0.2.0] - 2025-10-24
 
 ### Added
-- User and group management with role-based access control
+- Member and group management with role-based access control
 - Login and admin screens for managing the system
 - Book reservation flow with API and database integration
-- User profile management for updating user details and notification preferences
-- Email notification system for user registration and book reservations
+- Member profile management for updating member details and notification preferences
+- Email notification system for member registration and book reservations
 
 ## [0.1.0] - 2025-10-24
 

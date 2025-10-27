@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import AuthLayout from '../src/components/AuthLayout';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -14,7 +15,20 @@ export default function Register() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [plans, setPlans] = useState({});
   const router = useRouter();
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/subscriptions/plans`);
+        setPlans(response.data);
+      } catch (err) {
+        setError('Failed to load subscription plans.');
+      }
+    };
+    fetchPlans();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -28,7 +42,6 @@ export default function Register() {
 
     try {
       await axios.post(`${API_BASE_URL}/auth/register`, formData);
-      // Redirect to login page on success
       router.push('/login?registered=true');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to register. Please try again.');
@@ -38,25 +51,8 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <Link href="/" className="flex justify-center">
-          <svg className="h-12 w-12 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-          </svg>
-        </Link>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Create your account
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Already have an account?{' '}
-          <Link href="/login" className="font-medium text-primary-600 hover:text-primary-500">
-            Sign in
-          </Link>
-        </p>
-      </div>
-
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+    <AuthLayout title="Create your account">
+      <div className="mt-8">
         <div className="bg-white py-8 px-4 shadow-xl rounded-lg sm:px-10">
           {error && (
             <div className="mb-4 bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative">
@@ -123,10 +119,11 @@ export default function Register() {
                 onChange={handleChange}
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
               >
-                <option value="FREE">Free (3 books)</option>
-                <option value="BRONZE">Bronze (₹799/month - 5 books)</option>
-                <option value="SILVER">Silver (₹1599/month - 10 books)</option>
-                <option value="GOLD">Gold (₹2399/month - Unlimited)</option>
+                {Object.keys(plans).map((tier) => (
+                  <option key={tier} value={tier}>
+                    {plans[tier].name} ({plans[tier].price === 0 ? 'Free' : `₹${plans[tier].price}/month`}) - {plans[tier].lendingLimit === Infinity ? 'Unlimited' : `${plans[tier].lendingLimit} books`}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -161,7 +158,13 @@ export default function Register() {
             </div>
           </div>
         </div>
+        <p className="mt-4 text-center text-sm text-gray-600">
+          Already have an account?{' '}
+          <Link href="/login" className="font-medium text-primary-600 hover:text-primary-500">
+            Sign in
+          </Link>
+        </p>
       </div>
-    </div>
+    </AuthLayout>
   );
 }

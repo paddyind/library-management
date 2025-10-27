@@ -1,6 +1,6 @@
 import { IsString, IsEmail, MinLength, IsOptional } from 'class-validator';
 
-export class CreateUserDto {
+export class CreateMemberDto {
   @IsString()
   name: string;
 
@@ -20,7 +20,7 @@ export class CreateUserDto {
   subscription?: string;
 }
 
-export class UpdateUserDto {
+export class UpdateMemberDto {
   @IsOptional()
   @IsString()
   name?: string;

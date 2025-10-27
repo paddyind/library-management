@@ -33,17 +33,17 @@ The Library Management System is built as a modern web application with a clear 
 
 ### 2. Backend (NestJS + TypeScript)
 - **Modules**:
-  - `Auth`: Handles user authentication and JWTs
-  - `Users`: Manages user data and CRUD operations
-  - `Groups`: Manages user groups with role-based access and member management
+  - `Auth`: Handles member authentication and JWTs
+  - `Members`: Manages member data and CRUD operations
+  - `Groups`: Manages member groups with role-based access and member management
   - `Books`: Manages the book catalog with public access
   - `Loans`: Manages book borrowing and returns
   - `Reservations`: Manages book reservations
-  - `Profile`: Manages user profiles
+  - `Profile`: Manages member profiles
   - `Notifications`: Handles notification CRUD and email notifications
-  - `Transactions`: Manages user transactions, including loans and reservations
+  - `Transactions`: Manages member transactions, including loans and reservations
   - `Search`: Handles global search functionality
-  - `Subscriptions`: Manages user subscriptions and free trials
+  - `Subscriptions`: Manages member subscriptions and free trials
 - **Controllers**: HTTP request handlers with proper validation
 - **Services**: Business logic implementation with error handling
 - **Models**: TypeORM entities with relationships
@@ -54,13 +54,14 @@ The Library Management System is built as a modern web application with a clear 
 
 ### 3. Database (SQLite)
 - **Models**:
-  - `User`: User information, authentication, and relationships
-  - `Group`: User groups for RBAC with permissions array
+  - `Member`: Member information, authentication, and relationships
+  - `Group`: Member groups for RBAC with permissions array
   - `Book`: Book catalog with status and availability
   - `Loan`: Active book loans with due dates
   - `Reservation`: Book reservations queue
-  - `Subscription`: User subscription tiers and trials
-  - `Notification`: User notifications with types and read status
+  - `Subscription`: Member subscription tiers and trials
+  - `Notification`: Member notifications with types and read status
+  - `BookRequest`: Member book requests with status
 
 ### 4. Authentication
 - JWT-based authentication
@@ -93,17 +94,17 @@ The Library Management System is built as a modern web application with a clear 
 
 1. **Book Management**
    ```
-   User → Frontend → API Gateway → Backend Controller → Service → Database
+   Member → Frontend → API Gateway → Backend Controller → Service → Database
    ```
 
 2. **Authentication**
    ```
-   User → Login Form → Auth API → JWT Generation → Token Storage
+   Member → Login Form → Auth API → JWT Generation → Token Storage
    ```
 
 3. **Lending Process**
    ```
-   User → Book Selection → Loan Creation → Database Update → Notification
+   Member → Book Selection → Loan Creation → Database Update → Notification
    ```
 
 ## Scalability Considerations

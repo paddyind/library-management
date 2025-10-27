@@ -1,5 +1,5 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { User } from './user.entity';
+import { Member } from './member.entity';
 
 export enum NotificationType {
   INFO = 'info',
@@ -17,11 +17,11 @@ export class Notification {
   id: string;
 
   @Column()
-  userId: string;
+  memberId: string;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
-  user: User;
+  @ManyToOne(() => Member, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'memberId' })
+  member: Member;
 
   @Column()
   message: string;

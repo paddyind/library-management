@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Layout from '../src/components/layout/Layout.js';
+import BookRequestForm from '../src/components/requests/BookRequestForm.js';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -60,8 +61,10 @@ export default function SearchPage() {
 
           {!loading && !error && results.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">No results found for "{q}"</p>
-              <p className="text-gray-400 mt-2">Try searching with different keywords</p>
+              <p className="text-gray-500 text-lg mb-4">No results found for "{q}"</p>
+              <div className="max-w-xl mx-auto">
+                <BookRequestForm initialTitle={q} />
+              </div>
             </div>
           )}
 

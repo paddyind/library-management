@@ -1,19 +1,21 @@
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { User, UserRole } from './models/user.entity';
+import { Member, MemberRole } from './models/member.entity';
 import { Book } from './models/book.entity';
 import { Group } from './models/group.entity';
 import { Notification, NotificationType } from './models/notification.entity';
 import { Loan } from './models/loan.entity';
 import { Reservation } from './models/reservation.entity';
 import { Subscription } from './models/subscription.entity';
+import { BookRequest } from './models/book-request.entity';
+import { AuthenticationProvider } from './models/authentication-provider.entity';
 
 async function seed() {
   // Create DataSource
   const dataSource = new DataSource({
     type: 'sqlite',
     database: './data/library.sqlite', // Match the main app's database
-    entities: [User, Book, Group, Notification, Loan, Reservation, Subscription],
+    entities: [Member, Book, Group, Notification, Loan, Reservation, Subscription, BookRequest, AuthenticationProvider],
     synchronize: true, // Create tables if they don't exist
   });
 
@@ -21,14 +23,14 @@ async function seed() {
     await dataSource.initialize();
     console.log('📦 Database connection established');
 
-    const userRepository = dataSource.getRepository(User);
+    const memberRepository = dataSource.getRepository(Member);
     const bookRepository = dataSource.getRepository(Book);
     const groupRepository = dataSource.getRepository(Group);
     const notificationRepository = dataSource.getRepository(Notification);
 
     // Check if data already exists
-    const existingUsers = await userRepository.count();
-    if (existingUsers > 1) {
+    const existingMembers = await memberRepository.count();
+    if (existingMembers > 1) {
       console.log('⚠️  Seed data already exists. Skipping...');
       await dataSource.destroy();
       return;
@@ -36,38 +38,38 @@ async function seed() {
 
     console.log('🌱 Starting database seed...');
 
-    // Create Users
-    console.log('👤 Creating users...');
+    // Create Members
+    console.log('👤 Creating members...');
     const hashedPassword = await bcrypt.hash('password', 10);
 
-    const adminUser = userRepository.create({
+    const adminMember = memberRepository.create({
       email: 'admin@library.com',
       password: hashedPassword,
-      name: 'Admin User',
+      name: 'Admin Member',
       firstName: 'Admin',
-      lastName: 'User',
-      role: UserRole.ADMIN,
+      lastName: 'Member',
+      role: MemberRole.ADMIN,
     });
 
-    const regularUser = userRepository.create({
-      email: 'user@library.com',
+    const regularMember = memberRepository.create({
+      email: 'member@library.com',
       password: hashedPassword,
-      name: 'Regular User',
+      name: 'Regular Member',
       firstName: 'Regular',
-      lastName: 'User',
-      role: UserRole.MEMBER,
+      lastName: 'Member',
+      role: MemberRole.MEMBER,
     });
 
-    const [savedAdmin, savedRegularUser] = await userRepository.save([adminUser, regularUser]);
-    console.log(`✅ Created admin user: ${savedAdmin.email}`);
-    console.log(`✅ Created regular user: ${savedRegularUser.email}`);
+    const [savedAdmin, savedRegularMember] = await memberRepository.save([adminMember, regularMember]);
+    console.log(`✅ Created admin member: ${savedAdmin.email}`);
+    console.log(`✅ Created regular member: ${savedRegularMember.email}`);
 
     // Create Groups
     console.log('👥 Creating groups...');
     const adminGroup = groupRepository.create({
       name: 'Administrators',
       description: 'Full system access with all permissions',
-      permissions: ['manage_users', 'manage_books', 'manage_groups', 'view_reports', 'manage_system'],
+      permissions: ['manage_members', 'manage_books', 'manage_groups', 'view_reports', 'manage_system'],
     });
 
     const librarianGroup = groupRepository.create({
@@ -223,26 +225,26 @@ async function seed() {
     console.log('🔔 Creating sample notifications...');
     const notifications = [
       {
-        userId: savedRegularUser.id,
+        memberId: savedRegularMember.id,
         message: 'Welcome to the Library Management System!',
         type: NotificationType.INFO,
         isRead: false,
       },
       {
-        userId: savedRegularUser.id,
+        memberId: savedRegularMember.id,
         message: 'Book "1984" is due in 3 days. Please return it on time.',
         type: NotificationType.DUE_SOON,
         isRead: false,
       },
       {
-        userId: savedRegularUser.id,
+        memberId: savedRegularMember.id,
         message: 'Your membership has been activated successfully.',
         type: NotificationType.SUCCESS,
         isRead: true,
       },
       {
-        userId: savedAdmin.id,
-        message: 'New user registration: regular.user@library.com',
+        memberId: savedAdmin.id,
+        message: 'New member registration: regular.member@library.com',
         type: NotificationType.INFO,
         isRead: false,
       },
@@ -260,9 +262,9 @@ async function seed() {
     console.log('📋 SEED DATA SUMMARY');
     console.log('═══════════════════════════════════════');
     console.log('');
-    console.log('👤 Users Created:');
+    console.log('👤 Members Created:');
     console.log('   • admin@library.com (Admin)');
-    console.log('   • user@library.com (Member)');
+    console.log('   • member@library.com (Member)');
     console.log('   • Password for both: password');
     console.log('');
     console.log('👥 Groups Created:');
