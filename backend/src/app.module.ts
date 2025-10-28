@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { DatabaseModule } from './config/database.module';
+import { SupabaseModule } from './config/supabase.module';
 import { AuthModule } from './auth/auth.module';
 import { MembersModule } from './members/members.module';
 import { BooksModule } from './books/books.module';
@@ -17,7 +17,7 @@ import { BookRequestsModule } from './book-requests/book-requests.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    DatabaseModule,
+    SupabaseModule,
     AuthModule,
     MembersModule,
     BooksModule,

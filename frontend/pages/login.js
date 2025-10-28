@@ -1,11 +1,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../src/contexts/AuthContext';
-import axios from 'axios';
 import Link from 'next/link';
 import AuthLayout from '../src/components/AuthLayout';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -13,30 +10,22 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { login } = useAuth();
+  const { signIn } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    try {
-      const response = await axios.post(`${API_BASE_URL}/auth/login`, { 
-        email, 
-        password 
-      });
-      
-      // Use the login function from AuthContext
-      login(response.data.access_token, response.data.user);
-      
-      // Redirect to dashboard
-      router.push('/dashboard');
-    } catch (err) {
-      console.error('Login error:', err);
-      setError(err.response?.data?.message || 'Invalid email or password. Please try again.');
-    } finally {
-      setLoading(false);
+    const { error } = await signIn({ email, password });
+
+    if (error) {
+      setError(error.message);
+    } else {
+      router.push('/');
     }
+
+    setLoading(false);
   };
 
   return (
@@ -107,8 +96,10 @@ export default function Login() {
             </div>
 
             <div className="text-sm">
-              <Link href="/forgot-password" className="font-medium text-primary-600 hover:text-primary-500">
-                Forgot your password?
+              <Link href="/forgot-password">
+                <a className="font-medium text-primary-600 hover:text-primary-500">
+                  Forgot your password?
+                </a>
               </Link>
             </div>
           </div>
@@ -142,13 +133,17 @@ export default function Login() {
           <div className="text-center">
             <p className="text-sm text-gray-600">
               Don't have an account?{' '}
-              <Link href="/register" className="font-medium text-primary-600 hover:text-primary-500">
-                Register here
+              <Link href="/register">
+                <a className="font-medium text-primary-600 hover:text-primary-500">
+                  Register here
+                </a>
               </Link>
             </p>
             <p className="mt-2 text-sm text-gray-600">
-              <Link href="/" className="font-medium text-primary-600 hover:text-primary-500">
-                Browse books without signing in
+              <Link href="/">
+                <a className="font-medium text-primary-600 hover:text-primary-500">
+                  Browse books without signing in
+                </a>
               </Link>
             </p>
           </div>

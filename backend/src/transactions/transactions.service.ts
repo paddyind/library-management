@@ -1,37 +1,61 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Loan } from '../models/loan.entity';
-import { Reservation } from '../models/reservation.entity';
+import { SupabaseService } from '../config/supabase.service';
 
 @Injectable()
 export class TransactionsService {
-  constructor(
-    @InjectRepository(Loan)
-    private loansRepository: Repository<Loan>,
-    @InjectRepository(Reservation)
-    private reservationsRepository: Repository<Reservation>,
-  ) {}
+  constructor(private readonly supabaseService: SupabaseService) {}
 
   async findAll(): Promise<any[]> {
-    const loans = await this.loansRepository.find({ relations: ['book', 'borrower'] });
-    const reservations = await this.reservationsRepository.find({ relations: ['book', 'member'] });
+    const { data: loans, error: loansError } = await this.supabaseService
+      .getClient()
+      .from('loans')
+      .select('*, member:members(*), book:books(*)');
+
+    if (loansError) {
+      throw new Error(loansError.message);
+    }
+
+    const { data: reservations, error: reservationsError } = await this.supabaseService
+      .getClient()
+      .from('reservations')
+      .select('*, member:members(*), book:books(*)');
+
+    if (reservationsError) {
+      throw new Error(reservationsError.message);
+    }
 
     const transactions = [
-      ...loans.map(loan => ({ ...loan, member: loan.borrower, type: 'loan' })),
-      ...reservations.map(reservation => ({ ...reservation, member: reservation.member, type: 'reservation' })),
+      ...loans.map(loan => ({ ...loan, type: 'loan' })),
+      ...reservations.map(reservation => ({ ...reservation, type: 'reservation' })),
     ];
 
     return transactions;
   }
 
   async findMemberTransactions(memberId: string): Promise<any[]> {
-    const loans = await this.loansRepository.find({ where: { borrower: { id: memberId } }, relations: ['book', 'borrower'] });
-    const reservations = await this.reservationsRepository.find({ where: { member: { id: memberId } }, relations: ['book', 'member'] });
+    const { data: loans, error: loansError } = await this.supabaseService
+      .getClient()
+      .from('loans')
+      .select('*, member:members(*), book:books(*)')
+      .eq('borrower_id', memberId);
+
+    if (loansError) {
+      throw new Error(loansError.message);
+    }
+
+    const { data: reservations, error: reservationsError } = await this.supabaseService
+      .getClient()
+      .from('reservations')
+      .select('*, member:members(*), book:books(*)')
+      .eq('member_id', memberId);
+
+    if (reservationsError) {
+      throw new Error(reservationsError.message);
+    }
 
     const transactions = [
-      ...loans.map(loan => ({ ...loan, member: loan.borrower, type: 'loan' })),
-      ...reservations.map(reservation => ({ ...reservation, member: reservation.member, type: 'reservation' })),
+      ...loans.map(loan => ({ ...loan, type: 'loan' })),
+      ...reservations.map(reservation => ({ ...reservation, type: 'reservation' })),
     ];
 
     return transactions;

@@ -1,54 +1,73 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Reservation } from '../models/reservation.entity';
+import { SupabaseService } from '../config/supabase.service';
 import { CreateReservationDto } from '../dto/create-reservation.dto';
-import { Member } from '../models/member.entity';
-import { NotificationsService } from '../notifications/notifications.service';
+import { Reservation } from './reservation.interface';
+import { Member } from '../members/member.interface';
 
 @Injectable()
 export class ReservationsService {
-  constructor(
-    @InjectRepository(Reservation)
-    private readonly reservationRepository: Repository<Reservation>,
-    private readonly notificationsService: NotificationsService,
-  ) {}
+  constructor(private readonly supabaseService: SupabaseService) {}
 
-  findAll(): Promise<Reservation[]> {
-    return this.reservationRepository.find({ relations: ['member', 'book'] });
+  async findAll(): Promise<Reservation[]> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('reservations')
+      .select('*, member:members(*), book:books(*)');
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
   }
 
   async findOne(id: number): Promise<Reservation> {
-    const reservation = await this.reservationRepository.findOne({ 
-      where: { id }, 
-      relations: ['member', 'book']
-    });
-    
-    if (!reservation) {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('reservations')
+      .select('*, member:members(*), book:books(*)')
+      .eq('id', id)
+      .single();
+
+    if (error) {
       throw new NotFoundException(`Reservation with ID "${id}" not found`);
     }
-    
-    return reservation;
+
+    return data;
   }
 
   async create(createReservationDto: CreateReservationDto, member: Member): Promise<Reservation> {
-    const reservation = this.reservationRepository.create({
-      ...createReservationDto,
-      member,
-      status: 'reserved',
-    });
-    const savedReservation = await this.reservationRepository.save(reservation);
-    await this.notificationsService.sendMail(
-      member.email,
-      'Book Reserved',
-      `You have successfully reserved the book "${savedReservation.book.title}".`,
-    );
-    return savedReservation;
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('reservations')
+      .insert([
+        {
+          ...createReservationDto,
+          member_id: member.id,
+          status: 'reserved',
+        },
+      ])
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
   }
 
   async cancel(id: number): Promise<Reservation> {
-    const reservation = await this.findOne(id);
-    reservation.status = 'cancelled';
-    return this.reservationRepository.save(reservation);
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('reservations')
+      .update({ status: 'cancelled' })
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      throw new NotFoundException(`Reservation with ID "${id}" not found`);
+    }
+
+    return data;
   }
 }

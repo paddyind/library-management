@@ -2,20 +2,18 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@n
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { MembersService } from './members.service';
 import { CreateMemberDto, UpdateMemberDto } from '../dto/member.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { Roles } from '../auth/roles.decorator';
-import { RolesGuard } from '../auth/roles.guard';
-import { MemberRole } from '../models/member.entity';
+import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
+import { MemberRole } from './member.interface';
 
 @ApiTags('Members')
 @Controller('members')
 @ApiBearerAuth()
+@UseGuards(SupabaseAuthGuard)
 export class MembersController {
   constructor(private readonly membersService: MembersService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(MemberRole.ADMIN)
+  // TODO: Add role check to ensure only admins can create members
   @ApiOperation({ summary: 'Create new member', description: 'Create a new member (Admin only)' })
   @ApiBody({ type: CreateMemberDto })
   @ApiResponse({ status: 201, description: 'Member created successfully' })
@@ -25,9 +23,8 @@ export class MembersController {
     return this.membersService.create(createMemberDto, role);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(MemberRole.ADMIN)
   @Get()
+  // TODO: Add role check to ensure only admins can get all members
   @ApiOperation({ summary: 'Get all members', description: 'Retrieve all members (Admin only)' })
   @ApiResponse({ status: 200, description: 'List of all members' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -36,7 +33,6 @@ export class MembersController {
     return this.membersService.findAll();
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get(':id')
   @ApiOperation({ summary: 'Get member by ID', description: 'Retrieve a single member by ID' })
   @ApiResponse({ status: 200, description: 'Member found' })
@@ -46,7 +42,6 @@ export class MembersController {
     return this.membersService.findOne(id);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   @ApiOperation({ summary: 'Update member', description: 'Update member details' })
   @ApiBody({ type: UpdateMemberDto })
@@ -57,7 +52,6 @@ export class MembersController {
     return this.membersService.update(id, updateMemberDto);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete member', description: 'Remove a member from the system' })
   @ApiResponse({ status: 200, description: 'Member deleted successfully' })

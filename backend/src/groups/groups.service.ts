@@ -1,131 +1,125 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Group } from '../models/group.entity';
-import { Member } from '../models/member.entity';
+import { SupabaseService } from '../config/supabase.service';
 import { CreateGroupDto, UpdateGroupDto } from '../dto/create-group.dto';
+import { Group } from './group.interface';
+import { Member } from '../members/member.interface';
 
 @Injectable()
 export class GroupsService {
-  constructor(
-    @InjectRepository(Group)
-    private readonly groupRepository: Repository<Group>,
-    @InjectRepository(Member)
-    private readonly memberRepository: Repository<Member>,
-  ) {}
+  constructor(private readonly supabaseService: SupabaseService) {}
 
-  // Get all groups with member count
   async findAll(): Promise<any[]> {
-    const groups = await this.groupRepository.find({
-      relations: ['members'],
-    });
-    
-    return groups.map(group => ({
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('groups')
+      .select('*, members:group_members(count)');
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data.map(group => ({
       ...group,
-      memberCount: group.members?.length || 0,
+      memberCount: group.members[0]?.count || 0,
     }));
   }
 
-  // Get a single group with members
   async findOne(id: number): Promise<Group> {
-    const group = await this.groupRepository.findOne({
-      where: { id },
-      relations: ['members'],
-    });
-    
-    if (!group) {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('groups')
+      .select('*, members:members(*)')
+      .eq('id', id)
+      .single();
+
+    if (error) {
       throw new NotFoundException(`Group with ID "${id}" not found`);
     }
-    
-    return group;
+
+    return data;
   }
 
-  // Create a new group
   async create(createGroupDto: CreateGroupDto): Promise<Group> {
-    // Check if group name already exists
-    const existing = await this.groupRepository.findOne({
-      where: { name: createGroupDto.name },
-    });
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('groups')
+      .insert([createGroupDto])
+      .single();
 
-    if (existing) {
-      throw new ConflictException(`Group with name "${createGroupDto.name}" already exists`);
+    if (error) {
+      if (error.code === '23505') { // unique_violation
+        throw new ConflictException(`Group with name "${createGroupDto.name}" already exists`);
+      }
+      throw new Error(error.message);
     }
 
-    const group = this.groupRepository.create(createGroupDto);
-    return this.groupRepository.save(group);
+    return data;
   }
 
-  // Update a group
   async update(id: number, updateGroupDto: UpdateGroupDto): Promise<Group> {
-    const group = await this.findOne(id);
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('groups')
+      .update(updateGroupDto)
+      .eq('id', id)
+      .single();
 
-    // Check if new name conflicts with existing group
-    if (updateGroupDto.name && updateGroupDto.name !== group.name) {
-      const existing = await this.groupRepository.findOne({
-        where: { name: updateGroupDto.name },
-      });
-
-      if (existing) {
+    if (error) {
+      if (error.code === '23505') { // unique_violation
         throw new ConflictException(`Group with name "${updateGroupDto.name}" already exists`);
       }
+      throw new NotFoundException(`Group with ID "${id}" not found`);
     }
 
-    Object.assign(group, updateGroupDto);
-    return this.groupRepository.save(group);
+    return data;
   }
 
-  // Delete a group
   async remove(id: number): Promise<void> {
-    const group = await this.findOne(id);
-    await this.groupRepository.remove(group);
+    const { error } = await this.supabaseService.getClient().from('groups').delete().eq('id', id);
+
+    if (error) {
+      throw new NotFoundException(`Group with ID "${id}" not found`);
+    }
   }
 
-  // Add a member to a group
-  async addMember(groupId: number, memberId: string): Promise<Group> {
-    const group = await this.groupRepository.findOne({
-      where: { id: groupId },
-      relations: ['members'],
-    });
+  async addMember(groupId: number, memberId: string): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('group_members')
+      .insert([{ group_id: groupId, member_id: memberId }]);
 
-    if (!group) {
-      throw new NotFoundException(`Group with ID "${groupId}" not found`);
+    if (error) {
+        if (error.code === '23505') { // unique_violation
+            throw new ConflictException(`Member is already a member of this group`);
+        }
+        throw new Error(error.message);
     }
-
-    const member = await this.memberRepository.findOne({
-      where: { id: memberId },
-    });
-
-    if (!member) {
-      throw new NotFoundException(`Member with ID "${memberId}" not found`);
-    }
-
-    // Check if member is already in the group
-    if (group.members.some(m => m.id === memberId)) {
-      throw new ConflictException(`Member is already a member of this group`);
-    }
-
-    group.members.push(member);
-    return this.groupRepository.save(group);
   }
 
-  // Remove a member from a group
-  async removeMember(groupId: number, memberId: string): Promise<Group> {
-    const group = await this.groupRepository.findOne({
-      where: { id: groupId },
-      relations: ['members'],
-    });
+  async removeMember(groupId: number, memberId: string): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('group_members')
+      .delete()
+      .eq('group_id', groupId)
+      .eq('member_id', memberId);
 
-    if (!group) {
-      throw new NotFoundException(`Group with ID "${groupId}" not found`);
+    if (error) {
+        throw new Error(error.message);
     }
-
-    group.members = group.members.filter(m => m.id !== memberId);
-    return this.groupRepository.save(group);
   }
 
-  // Get all members of a group
   async getMembers(groupId: number): Promise<Member[]> {
-    const group = await this.findOne(groupId);
-    return group.members || [];
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('members')
+      .select('*, group_members!inner(group_id)')
+      .eq('group_members.group_id', groupId)
+
+    if (error) {
+        throw new Error(error.message)
+    }
+
+    return data;
   }
 }

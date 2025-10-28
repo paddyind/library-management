@@ -1,17 +1,10 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Loan } from '../models/loan.entity';
 import { LoansController } from './loans.controller';
 import { LoansService } from './loans.service';
-import { BooksModule } from '../books/books.module';
-import { MembersModule } from '../members/members.module';
+import { SupabaseModule } from '../config/supabase.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Loan]),
-    BooksModule,
-    MembersModule,
-  ],
+  imports: [SupabaseModule],
   controllers: [LoansController],
   providers: [LoansService],
 })

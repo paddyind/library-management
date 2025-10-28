@@ -1,33 +1,62 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
-import { Loan } from '../models/loan.entity';
+import { SupabaseService } from '../config/supabase.service';
 import { CreateLoanDto } from '../dto/loan.dto';
-import { Member } from '../models/member.entity';
-import { Book } from '../models/book.entity';
+import { Loan } from './loan.interface';
+import { Member } from '../members/member.interface';
+import { Book } from '../books/book.interface';
 import { subscriptionPlans } from '../config/subscription-plans';
+import { Subscription } from '../subscriptions/subscription.interface';
 
 @Injectable()
 export class LoansService {
-  constructor(
-    @InjectRepository(Loan)
-    private readonly loansRepository: Repository<Loan>,
-  ) {}
+  constructor(private readonly supabaseService: SupabaseService) {}
 
   async create(createLoanDto: CreateLoanDto, member: Member, book: Book): Promise<Loan> {
-    const subscription = member.subscriptions[0];
-    const plan = subscriptionPlans[subscription.tier];
-    const activeLoans = await this.loansRepository.count({ where: { borrower: { id: member.id }, returnDate: IsNull() } });
+    const { data: subscriptions, error: subscriptionsError } = await this.supabaseService
+      .getClient()
+      .from('subscriptions')
+      .select('*')
+      .eq('member_id', member.id)
+      .order('createdAt', { ascending: false });
 
-    if (activeLoans >= plan.lendingLimit) {
+    if (subscriptionsError) {
+      throw new Error(subscriptionsError.message);
+    }
+
+    const subscription = subscriptions[0] as Subscription;
+    const plan = subscriptionPlans[subscription.tier];
+
+    const { count, error: countError } = await this.supabaseService
+      .getClient()
+      .from('loans')
+      .select('*', { count: 'exact', head: true })
+      .eq('borrower_id', member.id)
+      .is('returnDate', null);
+
+    if (countError) {
+      throw new Error(countError.message);
+    }
+
+    if (count >= plan.lendingLimit) {
       throw new ConflictException('You have reached your borrowing limit.');
     }
 
-    const loan = this.loansRepository.create({
-      ...createLoanDto,
-      borrower: member,
-      book,
-    });
-    return this.loansRepository.save(loan);
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('loans')
+      .insert([
+        {
+          ...createLoanDto,
+          borrower_id: member.id,
+          book_id: book.id,
+        },
+      ])
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
   }
 }

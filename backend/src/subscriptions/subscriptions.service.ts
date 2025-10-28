@@ -1,16 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Subscription, SubscriptionTier } from '../models/subscription.entity';
-import { Member } from '../models/member.entity';
+import { SupabaseService } from '../config/supabase.service';
+import { Subscription, SubscriptionTier } from './subscription.interface';
+import { Member } from '../members/member.interface';
 import { subscriptionPlans } from '../config/subscription-plans';
 
 @Injectable()
 export class SubscriptionsService {
-  constructor(
-    @InjectRepository(Subscription)
-    private subscriptionsRepository: Repository<Subscription>,
-  ) {}
+  constructor(private readonly supabaseService: SupabaseService) {}
 
   async create(member: Member, tier: SubscriptionTier): Promise<Subscription> {
     const plan = subscriptionPlans[tier];
@@ -18,16 +14,26 @@ export class SubscriptionsService {
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + plan.lendingPeriod);
 
-    const subscription = this.subscriptionsRepository.create({
-      member,
-      tier,
-      startDate,
-      endDate,
-      isActive: true,
-      price: plan.price,
-      lendingLimit: plan.lendingLimit,
-    });
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('subscriptions')
+      .insert([
+        {
+          member_id: member.id,
+          tier,
+          startDate,
+          endDate,
+          isActive: true,
+          price: plan.price,
+          lendingLimit: plan.lendingLimit,
+        },
+      ])
+      .single();
 
-    return this.subscriptionsRepository.save(subscription);
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
   }
 }

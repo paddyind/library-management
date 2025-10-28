@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/router';
+import { useAuth } from '@/contexts/AuthContext';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_BASE_URL = 'http://localhost:4000/api';
 
-function BookList() {
+function BookList({ onAddClick }) {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { user, token } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -28,13 +30,12 @@ function BookList() {
   }, []);
 
   const handleReserve = async (bookId) => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        router.push('/login');
-        return;
-      }
-      
       await axios.post(`${API_BASE_URL}/reservations`, { bookId }, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -66,7 +67,7 @@ function BookList() {
     <div className="flex flex-col">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">Books Catalog</h1>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+        <button onClick={onAddClick} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
           Add New Book
         </button>
       </div>
@@ -89,9 +90,6 @@ function BookList() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Copies
-                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
@@ -111,15 +109,12 @@ function BookList() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        book.status === 'available' 
-                          ? 'bg-green-100 text-green-800' 
+                        book.status === 'available'
+                          ? 'bg-green-100 text-green-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
                         {book.status}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {book.copies}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
@@ -128,12 +123,6 @@ function BookList() {
                         className="text-indigo-600 hover:text-indigo-900 mr-4 disabled:opacity-50"
                       >
                         Reserve
-                      </button>
-                      <button className="text-indigo-600 hover:text-indigo-900 mr-4">
-                        Edit
-                      </button>
-                      <button className="text-red-600 hover:text-red-900">
-                        Delete
                       </button>
                     </td>
                   </tr>

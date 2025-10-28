@@ -1,83 +1,110 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Member, MemberRole } from '../models/member.entity';
+import { SupabaseService } from '../config/supabase.service';
 import { CreateMemberDto, UpdateMemberDto } from '../dto/member.dto';
-import * as bcrypt from 'bcrypt';
-import { NotificationsService } from '../notifications/notifications.service';
+import { Member, MemberRole } from './member.interface';
 
 @Injectable()
 export class MembersService {
-  constructor(
-    @InjectRepository(Member)
-    private membersRepository: Repository<Member>,
-    private readonly notificationsService: NotificationsService,
-  ) {}
+  constructor(private readonly supabaseService: SupabaseService) {}
 
   async create(createMemberDto: CreateMemberDto, role: MemberRole = MemberRole.MEMBER): Promise<Member> {
-    // Check if member with this email already exists
-    const existingMember = await this.findByEmail(createMemberDto.email);
+    const { email, password, name } = createMemberDto;
+
+    const { data: existingMember, error: existingMemberError } = await this.supabaseService
+      .getClient()
+      .from('members')
+      .select('email')
+      .eq('email', email)
+      .single();
+
     if (existingMember) {
       throw new ConflictException('A member with this email already exists');
     }
 
-    const hashedPassword = await bcrypt.hash(createMemberDto.password, 10);
-    const member = this.membersRepository.create({
-      ...createMemberDto,
-      password: hashedPassword,
-      role,
+    const { data: authData, error: authError } = await this.supabaseService.getClient().auth.signUp({
+      email,
+      password,
     });
 
-    try {
-      const savedMember = await this.membersRepository.save(member);
-      await this.notificationsService.sendMail(
-        savedMember.email,
-        'Welcome to the Library Management System',
-        `Hi ${savedMember.name}, welcome to the Library Management System!`,
-      );
-      return savedMember;
-    } catch (error) {
-      if (error.code === 'SQLITE_CONSTRAINT' || error.message?.includes('UNIQUE constraint')) {
-        throw new ConflictException('A member with this email already exists');
-      }
-      throw error;
+    if (authError) {
+      throw new Error(authError.message);
     }
+
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('members')
+      .insert([{ id: authData.user.id, name, email, role }])
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
   }
 
   async findAll(query?: string): Promise<Member[]> {
+    let queryBuilder = this.supabaseService.getClient().from('members').select('*');
+
     if (query) {
-      return this.membersRepository
-        .createQueryBuilder('member')
-        .where('member.name LIKE :query', { query: `%${query}%` })
-        .orWhere('member.email LIKE :query', { query: `%${query}%` })
-        .getMany();
+      queryBuilder = queryBuilder.or(`name.ilike.%${query}%,email.ilike.%${query}%`);
     }
-    return this.membersRepository.find();
+
+    const { data, error } = await queryBuilder;
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
   }
 
   async findOne(id: string): Promise<Member> {
-    const member = await this.membersRepository.findOne({ where: { id } });
-    if (!member) {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('members')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
       throw new NotFoundException(`Member with ID "${id}" not found`);
     }
-    return member;
+
+    return data;
   }
 
-  async findByEmail(email: string) {
-    return this.membersRepository.findOne({ where: { email } }).then(member => member || undefined);
+  async findByEmail(email: string): Promise<Member | undefined> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('members')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    return data || undefined;
   }
 
   async update(id: string, updateMemberDto: UpdateMemberDto): Promise<Member> {
-    const member = await this.findOne(id);
-    if (updateMemberDto.password) {
-      updateMemberDto.password = await bcrypt.hash(updateMemberDto.password, 10);
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('members')
+      .update(updateMemberDto)
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      throw new NotFoundException(`Member with ID "${id}" not found`);
     }
-    const updated = Object.assign(member, updateMemberDto);
-    return this.membersRepository.save(updated);
+
+    return data;
   }
 
   async remove(id: string): Promise<void> {
-    const member = await this.findOne(id);
-    await this.membersRepository.remove(member);
+    const { error } = await this.supabaseService.getClient().from('members').delete().eq('id', id);
+
+    if (error) {
+      throw new NotFoundException(`Member with ID "${id}" not found`);
+    }
   }
 }

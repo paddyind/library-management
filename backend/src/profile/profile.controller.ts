@@ -1,14 +1,14 @@
 import { Controller, Get, Put, Body, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 import { ProfileService } from './profile.service';
 import { UpdateMemberDto } from '../dto/member.dto';
 import type { Request } from 'express';
-import { Member } from '../models/member.entity';
+import { Member } from '../members/member.interface';
 
 @ApiTags('Profile')
 @Controller('profile')
-@UseGuards(JwtAuthGuard)
+@UseGuards(SupabaseAuthGuard)
 @ApiBearerAuth()
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
@@ -18,7 +18,7 @@ export class ProfileController {
   @ApiResponse({ status: 200, description: 'Profile retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getProfile(@Req() req: Request) {
-    const member = req.user as Member;
+    const member = (req as any).user;
     return this.profileService.getProfile(member.id);
   }
 
@@ -29,7 +29,7 @@ export class ProfileController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 400, description: 'Invalid input' })
   updateProfile(@Req() req: Request, @Body() updateProfileDto: UpdateMemberDto) {
-    const member = req.user as Member;
+    const member = (req as any).user;
     return this.profileService.updateProfile(member.id, updateProfileDto);
   }
 }
