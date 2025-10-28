@@ -7,13 +7,15 @@ import { Notification, NotificationType } from './models/notification.entity';
 import { Loan } from './models/loan.entity';
 import { Reservation } from './models/reservation.entity';
 import { Subscription } from './models/subscription.entity';
+import { BookRequest } from './models/book-request.entity';
+import { AuthenticationProvider } from './models/authentication-provider.entity';
 
 async function seed() {
   // Create DataSource
   const dataSource = new DataSource({
     type: 'sqlite',
     database: './data/library.sqlite', // Match the main app's database
-    entities: [Member, Book, Group, Notification, Loan, Reservation, Subscription],
+    entities: [Member, Book, Group, Notification, Loan, Reservation, Subscription, BookRequest, AuthenticationProvider],
     synchronize: true, // Create tables if they don't exist
   });
 

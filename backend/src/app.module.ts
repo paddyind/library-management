@@ -10,6 +10,7 @@ import { ProfileModule } from './profile/profile.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { TransactionsModule } from './transactions/transactions.module';
+import { BookRequestsModule } from './book-requests/book-requests.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { TransactionsModule } from './transactions/transactions.module';
     AuthModule,
     MembersModule,
     BooksModule,
+    BookRequestsModule,
     GroupsModule,
     ReservationsModule,
     ProfileModule,

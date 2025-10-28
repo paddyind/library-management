@@ -34,7 +34,7 @@ export class Subscription {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0.0 })
   price: number;
 
-  @Column()
+  @Column({ default: 3 })
   lendingLimit: number;
 
   @CreateDateColumn()
