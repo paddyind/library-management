@@ -3,10 +3,11 @@ import { useAuth } from '../src/contexts/AuthContext';
 import { useRouter } from 'next/router';
 import Layout from '../src/components/layout/Layout.js';
 import axios from 'axios';
+import withAuth from '../src/components/withAuth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
-export default function BooksPage() {
+function BooksPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [books, setBooks] = useState([]);
@@ -42,7 +43,7 @@ export default function BooksPage() {
       const token = localStorage.getItem('token');
       if (!token) return;
       
-      const response = await axios.get(`${API_BASE_URL}/transactions/my`, {
+      const response = await axios.get(`${API_BASE_URL}/transactions/my-transactions`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMyTransactions(response.data.filter(t => !t.returnDate));
@@ -246,3 +247,5 @@ export default function BooksPage() {
     </Layout>
   );
 }
+
+export default withAuth(BooksPage);

@@ -2,6 +2,7 @@ import Layout from '../src/components/layout/Layout.js';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../src/contexts/AuthContext';
+import withAuth from '../src/components/withAuth';
 
 function Settings() {
   const [activeTab, setActiveTab] = useState('general');
@@ -181,4 +182,4 @@ function Settings() {
   );
 }
 
-export default Settings;
+export default withAuth(Settings);

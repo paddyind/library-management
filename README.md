@@ -2,11 +2,11 @@
 
 A modern, full-stack library management system with **anonymous book browsing** and comprehensive administrative features. Built with Next.js, NestJS, and Docker.
 
-[![Version](https://img.shields.io/badge/version-1.0.5-blue.svg)](https://github.com/paddyind/library-management)
+[![Version](https://img.shields.io/badge/version-1.0.6-blue.svg)](https://github.com/paddyind/library-management)
 [![Frontend](https://img.shields.io/badge/frontend-100%25_complete-success.svg)](https://github.com/paddyind/library-management)
 [![Backend](https://img.shields.io/badge/backend-100%25_complete-success.svg)](https://github.com/paddyind/library-management)
 
-> **Latest Release (v1.0.5)**: Enhanced book browsing with search/filter, "My Current Books" section, complete authentication integration, and bug fixes. See [CHANGELOG.md](CHANGELOG.md) for details.
+> **Latest Release (v1.0.6)**: Security & authentication enhancements - Fixed backend compilation errors, added route protection to all member pages, improved navigation for unauthenticated users. See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ---
 
@@ -58,6 +58,7 @@ A modern, full-stack library management system with **anonymous book browsing** 
 3. **Access the application**
    - **Frontend**: http://localhost:3100
    - **Backend API**: http://localhost:4000/api
+   - **Swagger API Docs**: http://localhost:4000/api-docs
 
 4. **Create your first account**
    - Click "Register" on the welcome page
@@ -79,10 +80,67 @@ Regular User:
 
 ---
 
+## 🔒 Route Protection
+
+The application uses a role-based access control system with Higher-Order Components (HOCs) to protect routes.
+
+### Public Routes (No Authentication Required)
+- `/` - Home page with book search and catalog
+- `/login` - User login
+- `/register` - User registration
+- `/forgot-password` - Password recovery
+- `/help` - Help and documentation
+- `/search` - Book search
+
+### Protected Routes (Authentication Required)
+All member-only routes automatically redirect unauthenticated users to `/login`:
+- `/books` - Book browsing and borrowing (Members)
+- `/dashboard` - Personal dashboard (Members)
+- `/profile` - Profile management (Members)
+- `/settings` - User settings (Members)
+- `/transactions` - Borrowing history (Members)
+- `/notifications` - User notifications (Members)
+- `/reports` - Personal reports (Members)
+- `/my-requests` - Book requests (Members)
+- `/request-book` - Request new books (Members)
+
+### Admin-Only Routes (Admin Role Required)
+These routes require admin role and redirect non-admins to home page:
+- `/admin` - Admin dashboard (Admins)
+- `/members` - Member management (Admins)
+
+### Authentication Flow
+1. Unauthenticated users trying to access protected routes → Redirected to `/login`
+2. "Browse without account" links → Redirect to `/` (public home page)
+3. After successful login → Redirected to `/dashboard`
+4. After logout → Redirected to `/`
+
+---
+
 ## 📚 Documentation
 
 - **[Architecture](ARCHITECTURE.md)** - System architecture and design decisions
 - **[Changelog](CHANGELOG.md)** - Version history and updates
+- **[API Documentation](http://localhost:4000/api-docs)** - Interactive Swagger/OpenAPI documentation (when server is running)
+
+### API Documentation
+
+The backend provides comprehensive API documentation via Swagger UI. After starting the application, visit:
+- **Swagger UI**: http://localhost:4000/api-docs
+
+Features:
+- Interactive API explorer
+- Request/response schemas
+- Authentication testing (Bearer token)
+- Detailed endpoint descriptions
+- Try-it-out functionality
+
+Key API Endpoints:
+- **Authentication**: `/api/auth/login`, `/api/auth/register`
+- **Books**: `/api/books` (public access for GET, requires auth for POST/PUT/DELETE)
+- **Members**: `/api/members` (admin only)
+- **Transactions**: `/api/transactions` (member and admin access)
+- **Notifications**: `/api/notifications` (authenticated users)
 
 ---
 

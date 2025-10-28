@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
+import { withAdminAuth } from '../src/components/withAuth';
 
-export default function Admin() {
+function Admin() {
   const [user, setUser] = useState(null);
   const router = useRouter();
 
@@ -45,3 +46,5 @@ export default function Admin() {
     </div>
   );
 }
+
+export default withAdminAuth(Admin);

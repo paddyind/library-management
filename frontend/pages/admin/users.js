@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Layout from '../../src/components/layout/Layout.js';
-import withAdminAuth from '../../src/hoc/withAdminAuth';
+import { withAdminAuth } from '../../src/components/withAuth';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -26,7 +26,7 @@ function UsersPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/users`, {
+      const response = await axios.get(`${API_BASE_URL}/members`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUsers(response.data);
@@ -47,7 +47,7 @@ function UsersPage() {
       if (editingUser) {
         // Update existing user
         await axios.patch(
-          `${API_BASE_URL}/users/${editingUser.id}`,
+          `${API_BASE_URL}/members/${editingUser.id}`,
           formData,
           {
             headers: { Authorization: `Bearer ${token}` },
@@ -55,7 +55,7 @@ function UsersPage() {
         );
       } else {
         // Create new user
-        await axios.post(`${API_BASE_URL}/users`, formData, {
+        await axios.post(`${API_BASE_URL}/members`, formData, {
           headers: { Authorization: `Bearer ${token}` },
         });
       }
@@ -86,7 +86,7 @@ function UsersPage() {
     
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`${API_BASE_URL}/users/${userId}`, {
+      await axios.delete(`${API_BASE_URL}/members/${userId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       fetchUsers();

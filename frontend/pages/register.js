@@ -156,7 +156,7 @@ export default function Register() {
               </Link>
             </p>
             <p className="mt-2 text-sm text-gray-600">
-              <Link href="/books" className="font-medium text-primary-600 hover:text-primary-500">
+              <Link href="/" className="font-medium text-primary-600 hover:text-primary-500">
                 Browse books without signing in
               </Link>
             </p>

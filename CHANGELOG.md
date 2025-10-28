@@ -5,6 +5,143 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.6] - 2025-01-28
+
+### 🔒 Security & Authentication Enhancements
+
+### Fixed
+- **🔴 CRITICAL: Backend Compilation Errors**
+  - Fixed 11+ TypeScript compilation errors preventing backend startup
+  - Created entity alias files for backward compatibility (User → Member)
+  - Added missing module imports (BookRequestsModule, SubscriptionsModule)
+  - Fixed database constraint errors (lendingLimit default value)
+  - Backend successfully starts and all endpoints now responding
+
+- **Authentication & Authorization**:
+  - Fixed "Browse without account" links redirecting to protected /books page
+  - Now correctly redirects to public home page (/) instead
+  - Fixed navigation loop that would immediately redirect users to /login
+  - Updated both login.js and register.js pages
+  - Fixed withAuth export issue (added default export)
+  - Fixed withAdminAuth import in admin.js and users.js pages
+
+- **API Endpoint Corrections**:
+  - Fixed `/api/transactions/my` → `/api/transactions/my-transactions` (books.js)
+  - Fixed `/api/users` → `/api/members` (admin/users.js for all CRUD operations)
+  - Corrected import path for withAdminAuth HOC
+
+- **Protected Routes**:
+  - Added authentication protection to all member-only pages
+  - Applied `withAuth` HOC to: books, dashboard, profile, settings, transactions, notifications, reports
+  - Applied `withAdminAuth` HOC to: admin page
+  - Unauthenticated users now properly redirected to /login
+
+- **Backend Module Dependencies**:
+  - Added SubscriptionsModule to AuthModule imports
+  - Fixed AuthController dependency injection for SubscriptionsService
+  - Added BookRequestsModule to app.module imports
+  - Fixed TypeORM entity metadata errors
+
+- **Database Constraints**:
+  - Added `default: 3` to subscription.entity lendingLimit column
+  - Removed old database with constraint violations
+  - Rebuilt with fresh schema and seed data
+
+### Added
+- **🔥 Comprehensive Swagger/OpenAPI Documentation**:
+  - Enhanced API documentation with detailed descriptions for all endpoints
+  - Added Swagger decorators to all controllers:
+    * Authentication (login, register)
+    * Books (CRUD operations with public GET access)
+    * Members (admin-only user management)
+    * Transactions (admin and member transactions)
+    * Notifications (user notifications with read/unread tracking)
+    * Profile (user profile management)
+  - Improved Swagger UI configuration:
+    * Version updated to 1.0.6
+    * Detailed API description with features and authentication guide
+    * Contact information and repository link
+    * Organized endpoints by tags with descriptions
+    * JWT Bearer authentication setup
+    * Request/response schemas for all endpoints
+    * Custom styling for better UX
+  - Interactive API testing at http://localhost:4000/api-docs
+
+- **Entity Alias Files** (Backward Compatibility):
+  - `/backend/src/models/user.entity.ts` - Exports Member as User
+  - `/backend/src/users/users.service.ts` - Exports MembersService as UsersService
+  - `/backend/src/users/users.module.ts` - Exports MembersModule as UsersModule
+  - `/backend/src/dto/user.dto.ts` - Re-exports all DTOs from member.dto
+
+### Changed
+- **Navigation Improvements**:
+  - "Browse without account" button now points to home page (/) instead of /books
+  - Home page is fully public with search functionality
+  - Better UX for unauthenticated users
+
+- **API Documentation**:
+  - Updated Swagger version from 1.0 to 1.0.6
+  - Enhanced API descriptions with comprehensive feature list
+  - Added authentication instructions in Swagger UI
+  - Organized endpoints by functional tags
+
+### Technical Details
+- **Files Modified** (Frontend):
+  - `/frontend/src/components/withAuth.js` - Added default export
+  - `/frontend/pages/login.js` - Fixed browse link
+  - `/frontend/pages/register.js` - Fixed browse link
+  - `/frontend/pages/books.js` - Added withAuth protection, fixed API endpoint
+  - `/frontend/pages/dashboard.js` - Added withAuth protection
+  - `/frontend/pages/profile.js` - Added withAuth protection
+  - `/frontend/pages/settings.js` - Added withAuth protection
+  - `/frontend/pages/transactions.js` - Added withAuth protection
+  - `/frontend/pages/notifications.js` - Added withAuth protection
+  - `/frontend/pages/reports.js` - Added withAuth protection
+  - `/frontend/pages/admin.js` - Added withAdminAuth protection, fixed import
+  - `/frontend/pages/admin/users.js` - Fixed API endpoints and withAdminAuth import
+
+- **Files Modified** (Backend):
+  - `/backend/src/main.ts` - Enhanced Swagger configuration
+  - `/backend/src/auth/auth.controller.ts` - Added Swagger decorators
+  - `/backend/src/books/books.controller.ts` - Added Swagger decorators
+  - `/backend/src/members/members.controller.ts` - Added Swagger decorators
+  - `/backend/src/transactions/transactions.controller.ts` - Added Swagger decorators
+  - `/backend/src/notifications/notifications.controller.ts` - Added Swagger decorators
+  - `/backend/src/profile/profile.controller.ts` - Added Swagger decorators
+  - `/backend/src/auth/auth.module.ts` - Added SubscriptionsModule import
+  - `/backend/src/app.module.ts` - Added BookRequestsModule import
+  - `/backend/src/models/subscription.entity.ts` - Added default value to lendingLimit
+  - `/backend/src/seed.ts` - Added BookRequest and AuthenticationProvider entities
+
+### Security Notes
+- All member pages now require authentication
+- Admin pages require admin role verification
+- JWT token validation on all protected routes
+- Proper error handling for authentication failures
+- Comprehensive API documentation for secure integration
+
+### API Endpoints Summary
+**Public Endpoints**:
+- `GET /api/books` - Browse books without authentication
+- `GET /api/books/:id` - View book details
+- `POST /api/auth/login` - User login
+- `POST /api/auth/register` - User registration
+
+**Authenticated Endpoints**:
+- `GET /api/transactions/my-transactions` - User's transactions
+- `GET /api/profile` - User profile
+- `GET /api/notifications` - User notifications
+- And more...
+
+**Admin-Only Endpoints**:
+- `GET /api/members` - List all members
+- `POST /api/members` - Create member
+- `PATCH /api/members/:id` - Update member
+- `DELETE /api/members/:id` - Delete member
+- `GET /api/transactions` - All transactions
+
+
+
 ## [v1.0.5 FINAL] - 2025-10-26
 
 ### 🎉 Major Feature Release - Enhanced Book Browsing & Search

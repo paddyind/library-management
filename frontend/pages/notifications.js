@@ -3,10 +3,11 @@ import { useRouter } from 'next/router';
 import Layout from '../src/components/layout/Layout.js';
 import { useAuth } from '../src/contexts/AuthContext';
 import axios from 'axios';
+import withAuth from '../src/components/withAuth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
-export default function NotificationsPage() {
+function NotificationsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [notifications, setNotifications] = useState([]);
@@ -279,3 +280,5 @@ export default function NotificationsPage() {
     </Layout>
   );
 }
+
+export default withAuth(NotificationsPage);

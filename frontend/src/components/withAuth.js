@@ -62,3 +62,6 @@ export function withAdminAuth(Component) {
 export function withMemberAuth(Component) {
   return withAuth(Component, { requireRole: 'MEMBER' });
 }
+
+// Default export for convenience
+export default withAuth;

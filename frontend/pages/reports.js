@@ -1,4 +1,5 @@
 import Layout from '../src/components/layout/Layout.js';
+import withAuth from '../src/components/withAuth';
 
 function Reports() {
   return (
@@ -76,5 +77,5 @@ function Reports() {
   );
 }
 
-export default Reports;
+export default withAuth(Reports);
 

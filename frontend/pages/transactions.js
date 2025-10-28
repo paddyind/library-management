@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import Layout from '../src/components/layout/Layout.js';
 import { useAuth } from '../src/contexts/AuthContext';
 import axios from 'axios';
+import withAuth from '../src/components/withAuth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
-export default function TransactionsPage() {
+function TransactionsPage() {
   const { user, loading: authLoading } = useAuth();
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -167,3 +168,5 @@ export default function TransactionsPage() {
     </Layout>
   );
 }
+
+export default withAuth(TransactionsPage);

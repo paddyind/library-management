@@ -3,10 +3,11 @@ import Layout from '../src/components/layout/Layout.js';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useRouter } from 'next/router';
 import axios from 'axios';
+import withAuth from '../src/components/withAuth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
-export default function Dashboard() {
+function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState({
@@ -188,3 +189,5 @@ export default function Dashboard() {
     </Layout>
   );
 }
+
+export default withAuth(Dashboard);
