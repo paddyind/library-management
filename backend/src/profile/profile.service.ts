@@ -1,16 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { UsersService } from '../users/users.service';
-import { UpdateProfileDto } from '../dto/user.dto';
+import { MembersService } from '../members/members.service';
+import { UpdateMemberDto } from '../dto/member.dto';
 
 @Injectable()
 export class ProfileService {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly membersService: MembersService) {}
 
-  async getProfile(userId: string) {
-    return this.usersService.findOne(userId);
+  async getProfile(memberId: string) {
+    return this.membersService.findOne(memberId);
   }
 
-  async updateProfile(userId: string, updateProfileDto: UpdateProfileDto) {
-    return this.usersService.update(userId, updateProfileDto);
+  async updateProfile(memberId: string, updateProfileDto: UpdateMemberDto) {
+    return this.membersService.update(memberId, updateProfileDto);
   }
 }

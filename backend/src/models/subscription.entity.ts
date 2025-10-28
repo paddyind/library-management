@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from 'typeorm';
-import { User } from './user.entity';
+import { Member } from './member.entity';
 
 export enum SubscriptionTier {
   FREE = 'FREE',

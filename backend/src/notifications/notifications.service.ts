@@ -38,9 +38,9 @@ export class NotificationsService {
     return this.notificationRepository.save(notification);
   }
 
-  // Get all notifications for a user
-  async findByUser(userId: string, query?: NotificationQueryDto): Promise<Notification[]> {
-    const whereClause: any = { userId };
+  // Get all notifications for a member
+  async findByMember(memberId: string, query?: NotificationQueryDto): Promise<Notification[]> {
+    const whereClause: any = { memberId };
     
     if (query?.isRead !== undefined) {
       whereClause.isRead = query.isRead;
@@ -57,9 +57,9 @@ export class NotificationsService {
   }
 
   // Get a single notification
-  async findOne(id: string, userId: string): Promise<Notification> {
+  async findOne(id: string, memberId: string): Promise<Notification> {
     const notification = await this.notificationRepository.findOne({
-      where: { id, userId },
+      where: { id, memberId },
     });
 
     if (!notification) {
@@ -70,42 +70,42 @@ export class NotificationsService {
   }
 
   // Mark notification as read
-  async markAsRead(id: string, userId: string): Promise<Notification> {
-    const notification = await this.findOne(id, userId);
+  async markAsRead(id: string, memberId: string): Promise<Notification> {
+    const notification = await this.findOne(id, memberId);
     notification.isRead = true;
     return this.notificationRepository.save(notification);
   }
 
-  // Mark all notifications as read for a user
-  async markAllAsRead(userId: string): Promise<void> {
+  // Mark all notifications as read for a member
+  async markAllAsRead(memberId: string): Promise<void> {
     await this.notificationRepository.update(
-      { userId, isRead: false },
+      { memberId, isRead: false },
       { isRead: true },
     );
   }
 
   // Update a notification
-  async update(id: string, userId: string, updateNotificationDto: UpdateNotificationDto): Promise<Notification> {
-    const notification = await this.findOne(id, userId);
+  async update(id: string, memberId: string, updateNotificationDto: UpdateNotificationDto): Promise<Notification> {
+    const notification = await this.findOne(id, memberId);
     Object.assign(notification, updateNotificationDto);
     return this.notificationRepository.save(notification);
   }
 
   // Delete a notification
-  async remove(id: string, userId: string): Promise<void> {
-    const notification = await this.findOne(id, userId);
+  async remove(id: string, memberId: string): Promise<void> {
+    const notification = await this.findOne(id, memberId);
     await this.notificationRepository.remove(notification);
   }
 
-  // Delete all notifications for a user
-  async removeAll(userId: string): Promise<void> {
-    await this.notificationRepository.delete({ userId });
+  // Delete all notifications for a member
+  async removeAll(memberId: string): Promise<void> {
+    await this.notificationRepository.delete({ memberId });
   }
 
-  // Get unread count for a user
-  async getUnreadCount(userId: string): Promise<number> {
+  // Get unread count for a member
+  async getUnreadCount(memberId: string): Promise<number> {
     return this.notificationRepository.count({
-      where: { userId, isRead: false },
+      where: { memberId, isRead: false },
     });
   }
 
@@ -132,27 +132,27 @@ export class NotificationsService {
   }
 
   // Helper method to create notification for book overdue
-  async createOverdueNotification(userId: string, bookTitle: string): Promise<Notification> {
+  async createOverdueNotification(memberId: string, bookTitle: string): Promise<Notification> {
     return this.create({
-      userId,
+      memberId,
       message: `Book "${bookTitle}" is overdue. Please return it as soon as possible.`,
       type: NotificationType.OVERDUE,
     });
   }
 
   // Helper method to create notification for book due soon
-  async createDueSoonNotification(userId: string, bookTitle: string, dueDate: Date): Promise<Notification> {
+  async createDueSoonNotification(memberId: string, bookTitle: string, dueDate: Date): Promise<Notification> {
     return this.create({
-      userId,
+      memberId,
       message: `Book "${bookTitle}" is due on ${dueDate.toDateString()}. Please return it on time.`,
       type: NotificationType.DUE_SOON,
     });
   }
 
   // Helper method to create reservation ready notification
-  async createReservationReadyNotification(userId: string, bookTitle: string): Promise<Notification> {
+  async createReservationReadyNotification(memberId: string, bookTitle: string): Promise<Notification> {
     return this.create({
-      userId,
+      memberId,
       message: `Book "${bookTitle}" is now available for pickup. Your reservation is ready!`,
       type: NotificationType.RESERVATION_READY,
     });

@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Reservation } from '../models/reservation.entity';
 import { CreateReservationDto } from '../dto/create-reservation.dto';
-import { User } from '../models/user.entity';
+import { Member } from '../models/member.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
@@ -15,13 +15,13 @@ export class ReservationsService {
   ) {}
 
   findAll(): Promise<Reservation[]> {
-    return this.reservationRepository.find({ relations: ['user', 'book'] });
+    return this.reservationRepository.find({ relations: ['member', 'book'] });
   }
 
   async findOne(id: number): Promise<Reservation> {
     const reservation = await this.reservationRepository.findOne({ 
       where: { id }, 
-      relations: ['user', 'book'] 
+      relations: ['member', 'book']
     });
     
     if (!reservation) {
@@ -31,15 +31,15 @@ export class ReservationsService {
     return reservation;
   }
 
-  async create(createReservationDto: CreateReservationDto, user: User): Promise<Reservation> {
+  async create(createReservationDto: CreateReservationDto, member: Member): Promise<Reservation> {
     const reservation = this.reservationRepository.create({
       ...createReservationDto,
-      user,
+      member,
       status: 'reserved',
     });
     const savedReservation = await this.reservationRepository.save(reservation);
     await this.notificationsService.sendMail(
-      user.email,
+      member.email,
       'Book Reserved',
       `You have successfully reserved the book "${savedReservation.book.title}".`,
     );

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './config/database.module';
 import { AuthModule } from './auth/auth.module';
-import { UsersModule } from './users/users.module';
+import { MembersModule } from './members/members.module';
 import { BooksModule } from './books/books.module';
 import { GroupsModule } from './groups/groups.module';
 import { ReservationsModule } from './reservations/reservations.module';
@@ -18,7 +18,7 @@ import { TransactionsModule } from './transactions/transactions.module';
     }),
     DatabaseModule,
     AuthModule,
-    UsersModule,
+    MembersModule,
     BooksModule,
     GroupsModule,
     ReservationsModule,

@@ -15,23 +15,23 @@ export class TransactionsService {
 
   async findAll(): Promise<any[]> {
     const loans = await this.loansRepository.find({ relations: ['book', 'borrower'] });
-    const reservations = await this.reservationsRepository.find({ relations: ['book', 'user'] });
+    const reservations = await this.reservationsRepository.find({ relations: ['book', 'member'] });
 
     const transactions = [
       ...loans.map(loan => ({ ...loan, member: loan.borrower, type: 'loan' })),
-      ...reservations.map(reservation => ({ ...reservation, member: reservation.user, type: 'reservation' })),
+      ...reservations.map(reservation => ({ ...reservation, member: reservation.member, type: 'reservation' })),
     ];
 
     return transactions;
   }
 
-  async findUserTransactions(userId: string): Promise<any[]> {
-    const loans = await this.loansRepository.find({ where: { borrower: { id: userId } }, relations: ['book', 'borrower'] });
-    const reservations = await this.reservationsRepository.find({ where: { user: { id: userId } }, relations: ['book', 'user'] });
+  async findMemberTransactions(memberId: string): Promise<any[]> {
+    const loans = await this.loansRepository.find({ where: { borrower: { id: memberId } }, relations: ['book', 'borrower'] });
+    const reservations = await this.reservationsRepository.find({ where: { member: { id: memberId } }, relations: ['book', 'member'] });
 
     const transactions = [
       ...loans.map(loan => ({ ...loan, member: loan.borrower, type: 'loan' })),
-      ...reservations.map(reservation => ({ ...reservation, member: reservation.user, type: 'reservation' })),
+      ...reservations.map(reservation => ({ ...reservation, member: reservation.member, type: 'reservation' })),
     ];
 
     return transactions;

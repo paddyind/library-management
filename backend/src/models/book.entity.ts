@@ -1,5 +1,5 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne } from 'typeorm';
-import { User } from './user.entity';
+import { Member } from './member.entity';
 import { Loan } from './loan.entity';
 import { Reservation } from './reservation.entity';
 
@@ -29,8 +29,8 @@ export class Book {
   @Column({ default: 'available' })
   status: 'available' | 'lent' | 'unavailable';
 
-  @ManyToOne(() => User, user => user.books)
-  owner: User;
+  @ManyToOne(() => Member, member => member.books)
+  owner: Member;
 
   @OneToMany(() => Loan, loan => loan.book)
   loans: Loan[];

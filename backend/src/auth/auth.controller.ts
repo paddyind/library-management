@@ -4,6 +4,7 @@ import { AuthDto } from '../dto/auth.dto';
 import { CreateMemberDto } from '../dto/member.dto';
 import { MembersService } from '../members/members.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { SubscriptionTier } from '../models/subscription.entity';
 
 @Controller('auth')
 export class AuthController {
@@ -25,7 +26,7 @@ export class AuthController {
   @Post('register')
   async register(@Body() createMemberDto: CreateMemberDto) {
     const member = await this.membersService.create(createMemberDto);
-    await this.subscriptionsService.create(member, createMemberDto.subscription);
+    await this.subscriptionsService.create(member, createMemberDto.subscription || SubscriptionTier.FREE);
     return member;
   }
 }
