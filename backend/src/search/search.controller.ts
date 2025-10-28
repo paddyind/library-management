@@ -3,11 +3,11 @@ import { SearchService } from './search.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { UserRole } from '../models/user.entity';
+import { MemberRole } from '../models/member.entity';
 
 import { Req } from '@nestjs/common';
 import type { Request } from 'express';
-import { User } from 'src/models/user.entity';
+import { Member } from 'src/models/member.entity';
 
 @Controller('search')
 export class SearchController {
@@ -16,8 +16,8 @@ export class SearchController {
   @Get()
   @UseGuards(JwtAuthGuard)
   search(@Req() req: Request, @Query('q') query: string, @Query('type') type: string) {
-    const user = req.user as User;
-    if (type === 'members' && user.role !== UserRole.ADMIN) {
+    const member = req.user as Member;
+    if (type === 'members' && member.role !== MemberRole.ADMIN) {
       return [];
     }
     return this.searchService.search(query, type);

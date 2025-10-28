@@ -5,6 +5,7 @@ import { Group } from '../models/group.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { MemberRole } from '../models/member.entity';
 
 @Controller('groups')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -25,14 +26,14 @@ export class GroupsController {
 
   // Create a new group (Admin only)
   @Post()
-  @Roles('Admin')
+  @Roles(MemberRole.ADMIN)
   create(@Body() createGroupDto: CreateGroupDto): Promise<Group> {
     return this.groupsService.create(createGroupDto);
   }
 
   // Update a group (Admin only)
   @Put(':id')
-  @Roles('Admin')
+  @Roles(MemberRole.ADMIN)
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateGroupDto: UpdateGroupDto,
@@ -42,7 +43,7 @@ export class GroupsController {
 
   // Delete a group (Admin only)
   @Delete(':id')
-  @Roles('Admin')
+  @Roles(MemberRole.ADMIN)
   async remove(@Param('id', ParseIntPipe) id: number): Promise<{ message: string }> {
     await this.groupsService.remove(id);
     return { message: 'Group deleted successfully' };
@@ -56,22 +57,22 @@ export class GroupsController {
 
   // Add a member to a group (Admin only)
   @Post(':id/members')
-  @Roles('Admin')
+  @Roles(MemberRole.ADMIN)
   addMember(
     @Param('id', ParseIntPipe) id: number,
     @Body() addMemberDto: AddMemberDto,
   ) {
-    return this.groupsService.addMember(id, addMemberDto.userId);
+    return this.groupsService.addMember(id, addMemberDto.memberId);
   }
 
   // Remove a member from a group (Admin only)
-  @Delete(':id/members/:userId')
-  @Roles('Admin')
+  @Delete(':id/members/:memberId')
+  @Roles(MemberRole.ADMIN)
   async removeMember(
     @Param('id', ParseIntPipe) id: number,
-    @Param('userId') userId: string,
+    @Param('memberId') memberId: string,
   ): Promise<{ message: string }> {
-    await this.groupsService.removeMember(id, userId);
+    await this.groupsService.removeMember(id, memberId);
     return { message: 'Member removed from group successfully' };
   }
 }

@@ -1,5 +1,5 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToOne } from 'typeorm';
-import { User } from './user.entity';
+import { Member } from './member.entity';
 import { Book } from './book.entity';
 
 @Entity('loans')
@@ -10,8 +10,8 @@ export class Loan {
   @ManyToOne(() => Book, book => book.loans)
   book: Book;
 
-  @ManyToOne(() => User, user => user.borrowedBooks)
-  borrower: User;
+  @ManyToOne(() => Member, member => member.borrowedBooks)
+  borrower: Member;
 
   @Column()
   issueDate: Date;

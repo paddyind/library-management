@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Group } from '../models/group.entity';
-import { User } from '../models/user.entity';
+import { Member } from '../models/member.entity';
 import { CreateGroupDto, UpdateGroupDto } from '../dto/create-group.dto';
 
 @Injectable()
@@ -10,19 +10,19 @@ export class GroupsService {
   constructor(
     @InjectRepository(Group)
     private readonly groupRepository: Repository<Group>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    @InjectRepository(Member)
+    private readonly memberRepository: Repository<Member>,
   ) {}
 
-  // Get all groups with user count
+  // Get all groups with member count
   async findAll(): Promise<any[]> {
     const groups = await this.groupRepository.find({
-      relations: ['users'],
+      relations: ['members'],
     });
     
     return groups.map(group => ({
       ...group,
-      memberCount: group.users?.length || 0,
+      memberCount: group.members?.length || 0,
     }));
   }
 
@@ -30,7 +30,7 @@ export class GroupsService {
   async findOne(id: number): Promise<Group> {
     const group = await this.groupRepository.findOne({
       where: { id },
-      relations: ['users'],
+      relations: ['members'],
     });
     
     if (!group) {
@@ -80,52 +80,52 @@ export class GroupsService {
     await this.groupRepository.remove(group);
   }
 
-  // Add a user to a group
-  async addMember(groupId: number, userId: string): Promise<Group> {
+  // Add a member to a group
+  async addMember(groupId: number, memberId: string): Promise<Group> {
     const group = await this.groupRepository.findOne({
       where: { id: groupId },
-      relations: ['users'],
+      relations: ['members'],
     });
 
     if (!group) {
       throw new NotFoundException(`Group with ID "${groupId}" not found`);
     }
 
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
+    const member = await this.memberRepository.findOne({
+      where: { id: memberId },
     });
 
-    if (!user) {
-      throw new NotFoundException(`User with ID "${userId}" not found`);
+    if (!member) {
+      throw new NotFoundException(`Member with ID "${memberId}" not found`);
     }
 
-    // Check if user is already in the group
-    if (group.users.some(u => u.id === userId)) {
-      throw new ConflictException(`User is already a member of this group`);
+    // Check if member is already in the group
+    if (group.members.some(m => m.id === memberId)) {
+      throw new ConflictException(`Member is already a member of this group`);
     }
 
-    group.users.push(user);
+    group.members.push(member);
     return this.groupRepository.save(group);
   }
 
-  // Remove a user from a group
-  async removeMember(groupId: number, userId: string): Promise<Group> {
+  // Remove a member from a group
+  async removeMember(groupId: number, memberId: string): Promise<Group> {
     const group = await this.groupRepository.findOne({
       where: { id: groupId },
-      relations: ['users'],
+      relations: ['members'],
     });
 
     if (!group) {
       throw new NotFoundException(`Group with ID "${groupId}" not found`);
     }
 
-    group.users = group.users.filter(u => u.id !== userId);
+    group.members = group.members.filter(m => m.id !== memberId);
     return this.groupRepository.save(group);
   }
 
   // Get all members of a group
-  async getMembers(groupId: number): Promise<User[]> {
+  async getMembers(groupId: number): Promise<Member[]> {
     const group = await this.findOne(groupId);
-    return group.users || [];
+    return group.members || [];
   }
 }

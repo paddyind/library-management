@@ -18,8 +18,7 @@ export class CreateMemberDto {
 
   @ApiProperty({ enum: SubscriptionTier, example: SubscriptionTier.FREE })
   @IsEnum(SubscriptionTier)
-  @IsOptional()
-  subscription?: SubscriptionTier;
+  subscription: SubscriptionTier;
 }
 
 export class UpdateMemberDto {

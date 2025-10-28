@@ -3,7 +3,7 @@ import { NotificationType } from '../models/notification.entity';
 
 export class CreateNotificationDto {
   @IsUUID()
-  userId: string;
+  memberId: string;
 
   @IsString()
   message: string;

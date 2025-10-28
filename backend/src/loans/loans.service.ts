@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { Loan } from '../models/loan.entity';
 import { CreateLoanDto } from '../dto/loan.dto';
 import { Member } from '../models/member.entity';
@@ -17,7 +17,7 @@ export class LoansService {
   async create(createLoanDto: CreateLoanDto, member: Member, book: Book): Promise<Loan> {
     const subscription = member.subscriptions[0];
     const plan = subscriptionPlans[subscription.tier];
-    const activeLoans = await this.loansRepository.count({ where: { member: { id: member.id }, returnedAt: null } });
+    const activeLoans = await this.loansRepository.count({ where: { borrower: { id: member.id }, returnDate: IsNull() } });
 
     if (activeLoans >= plan.lendingLimit) {
       throw new ConflictException('You have reached your borrowing limit.');
@@ -25,7 +25,7 @@ export class LoansService {
 
     const loan = this.loansRepository.create({
       ...createLoanDto,
-      member,
+      borrower: member,
       book,
     });
     return this.loansRepository.save(loan);

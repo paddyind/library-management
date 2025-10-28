@@ -31,10 +31,10 @@ export class UpdateGroupDto {
 
 export class AddMemberDto {
   @IsUUID()
-  userId: string;
+  memberId: string;
 }
 
 export class RemoveMemberDto {
   @IsUUID()
-  userId: string;
+  memberId: string;
 }

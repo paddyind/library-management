@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { User } from './user.entity';
+import { Member } from './member.entity';
 
 @Entity('groups')
 export class Group {
@@ -15,8 +15,8 @@ export class Group {
   @Column('simple-json', { nullable: true })
   permissions: string[];
 
-  @ManyToMany(() => User, user => user.groups)
-  users: User[];
+  @ManyToMany(() => Member, member => member.groups)
+  members: Member[];
 
   @CreateDateColumn()
   createdAt: Date;

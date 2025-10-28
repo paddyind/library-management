@@ -11,46 +11,46 @@ export class NotificationsController {
   // Get all notifications for the current user
   @Get()
   async findAll(@Request() req, @Query() query: NotificationQueryDto) {
-    return this.notificationsService.findByUser(req.user.userId, query);
+    return this.notificationsService.findByMember(req.user.sub, query);
   }
 
   // Get unread count
   @Get('unread-count')
   async getUnreadCount(@Request() req) {
-    const count = await this.notificationsService.getUnreadCount(req.user.userId);
+    const count = await this.notificationsService.getUnreadCount(req.user.sub);
     return { count };
   }
 
   // Get a specific notification
   @Get(':id')
   async findOne(@Param('id') id: string, @Request() req) {
-    return this.notificationsService.findOne(id, req.user.userId);
+    return this.notificationsService.findOne(id, req.user.sub);
   }
 
   // Mark notification as read
   @Post(':id/mark-read')
   async markAsRead(@Param('id') id: string, @Request() req) {
-    return this.notificationsService.markAsRead(id, req.user.userId);
+    return this.notificationsService.markAsRead(id, req.user.sub);
   }
 
   // Mark all notifications as read
   @Post('mark-all-read')
   async markAllAsRead(@Request() req) {
-    await this.notificationsService.markAllAsRead(req.user.userId);
+    await this.notificationsService.markAllAsRead(req.user.sub);
     return { message: 'All notifications marked as read' };
   }
 
   // Delete a notification
   @Delete(':id')
   async remove(@Param('id') id: string, @Request() req) {
-    await this.notificationsService.remove(id, req.user.userId);
+    await this.notificationsService.remove(id, req.user.sub);
     return { message: 'Notification deleted successfully' };
   }
 
   // Delete all notifications
   @Delete()
   async removeAll(@Request() req) {
-    await this.notificationsService.removeAll(req.user.userId);
+    await this.notificationsService.removeAll(req.user.sub);
     return { message: 'All notifications deleted successfully' };
   }
 }
