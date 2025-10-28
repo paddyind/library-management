@@ -27,9 +27,9 @@ export default function Help() {
       gradient: 'from-purple-500 to-pink-600',
       items: [
         { plan: 'Free', price: '₹0', books: '3 books', color: 'text-gray-600' },
-        { plan: 'Bronze', price: '₹799/month', books: '5 books', color: 'text-amber-600' },
-        { plan: 'Silver', price: '₹1599/month', books: '10 books', color: 'text-gray-400' },
-        { plan: 'Gold', price: '₹2399/month', books: 'Unlimited', color: 'text-yellow-500' },
+        { plan: 'Bronze', price: '₹299/month', books: '5 books', color: 'text-amber-600' },
+        { plan: 'Silver', price: '₹599/month', books: '10 books', color: 'text-gray-400' },
+        { plan: 'Gold', price: '₹999/month', books: '20 books', color: 'text-yellow-500' },
       ]
     },
     {
@@ -74,13 +74,21 @@ export default function Help() {
                 Library Management System
               </h1>
             </Link>
-            <Link
-              href="/login"
-              className="relative inline-flex items-center px-6 py-3 overflow-hidden text-sm font-medium text-white bg-gradient-to-r from-primary-600 to-purple-600 rounded-full group hover:from-primary-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-            >
-              <span className="relative z-10">Sign In</span>
-              <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-purple-600 to-primary-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            </Link>
+            <div className="flex items-center space-x-4">
+                <Link
+                  href="/login"
+                  className="relative inline-flex items-center px-6 py-3 overflow-hidden text-sm font-medium text-white bg-gradient-to-r from-primary-600 to-purple-600 rounded-full group hover:from-primary-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                >
+                  <span className="relative z-10">Sign In</span>
+                  <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-purple-600 to-primary-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                </Link>
+                <Link
+                  href="/register"
+                  className="relative inline-flex items-center px-6 py-3 overflow-hidden text-sm font-medium text-primary-600 bg-white rounded-full group hover:bg-gray-50 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 border-2 border-primary-600"
+                >
+                  <span className="relative z-10">Register</span>
+                </Link>
+            </div>
           </div>
         </div>
       </header>

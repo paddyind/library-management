@@ -146,6 +146,11 @@ export default function Login() {
                 Register here
               </Link>
             </p>
+            <p className="mt-2 text-sm text-gray-600">
+              <Link href="/books" className="font-medium text-primary-600 hover:text-primary-500">
+                Browse books without signing in
+              </Link>
+            </p>
           </div>
         </form>
 
