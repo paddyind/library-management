@@ -1,12 +1,10 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { SubscriptionsController } from './subscriptions.controller';
 import { SubscriptionsService } from './subscriptions.service';
-import { MembersModule } from '../members/members.module';
-import { Subscription } from '../models/subscription.entity';
+import { SupabaseModule } from '../config/supabase.module';
 
 @Module({
-  imports: [MembersModule, TypeOrmModule.forFeature([Subscription])],
+  imports: [SupabaseModule],
   controllers: [SubscriptionsController],
   providers: [SubscriptionsService],
   exports: [SubscriptionsService],

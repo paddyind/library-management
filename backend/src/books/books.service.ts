@@ -1,61 +1,77 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Book } from '../models/book.entity';
+import { SupabaseService } from '../config/supabase.service';
 import { CreateBookDto, UpdateBookDto } from '../dto/book.dto';
+import { Book } from './book.interface';
 
 @Injectable()
 export class BooksService {
-  constructor(
-    @InjectRepository(Book)
-    private readonly booksRepository: Repository<Book>,
-  ) {}
+  constructor(private readonly supabaseService: SupabaseService) {}
 
   async create(createBookDto: CreateBookDto, ownerId: string): Promise<Book> {
-    const book = this.booksRepository.create({
-      ...createBookDto,
-      owner: { id: ownerId } as any,
-    });
-    return this.booksRepository.save(book);
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('books')
+      .insert([{ ...createBookDto, owner_id: ownerId }])
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
   }
 
   async findAll(query?: string): Promise<Book[]> {
-    const queryBuilder = this.booksRepository.createQueryBuilder('book');
+    let queryBuilder = this.supabaseService.getClient().from('books').select('*');
 
     if (query) {
-      queryBuilder
-        .where('book.title LIKE :query', { query: `%${query}%` })
-        .orWhere('book.author LIKE :query', { query: `%${query}%` })
-        .orWhere('book.isbn LIKE :query', { query: `%${query}%` });
+      queryBuilder = queryBuilder.or(`title.ilike.%${query}%,author.ilike.%${query}%,isbn.ilike.%${query}%`);
     }
 
-    return queryBuilder
-      .leftJoinAndSelect('book.owner', 'owner')
-      .orderBy('book.createdAt', 'DESC')
-      .getMany();
+    const { data, error } = await queryBuilder;
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
   }
 
   async findOne(id: string): Promise<Book> {
-    const book = await this.booksRepository.findOne({
-      where: { id },
-      relations: ['owner', 'loans'],
-    });
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('books')
+      .select('*, owner:members(*), loans:loans(*)')
+      .eq('id', id)
+      .single();
 
-    if (!book) {
+    if (error) {
       throw new NotFoundException(`Book with ID "${id}" not found`);
     }
 
-    return book;
+    return data;
   }
 
   async update(id: string, updateBookDto: UpdateBookDto): Promise<Book> {
-    const book = await this.findOne(id);
-    const updated = Object.assign(book, updateBookDto);
-    return this.booksRepository.save(updated);
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('books')
+      .update(updateBookDto)
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      throw new NotFoundException(`Book with ID "${id}" not found`);
+    }
+
+    return data;
   }
 
   async remove(id: string): Promise<void> {
-    const book = await this.findOne(id);
-    await this.booksRepository.remove(book);
+    const { error } = await this.supabaseService.getClient().from('books').delete().eq('id', id);
+
+    if (error) {
+      throw new NotFoundException(`Book with ID "${id}" not found`);
+    }
   }
 }

@@ -1,11 +1,10 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { BookRequest } from '../models/book-request.entity';
 import { BookRequestsController } from './book-requests.controller';
 import { BookRequestsService } from './book-requests.service';
+import { SupabaseModule } from '../config/supabase.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([BookRequest])],
+  imports: [SupabaseModule],
   controllers: [BookRequestsController],
   providers: [BookRequestsService],
 })

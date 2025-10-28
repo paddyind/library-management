@@ -1,17 +1,35 @@
 import { useState } from 'react';
+import axios from 'axios';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/router';
+
+const API_BASE_URL = 'http://localhost:4000/api';
 
 function MemberForm({ member, onSubmit }) {
   const [formData, setFormData] = useState(member || {
     name: '',
     email: '',
-    phone: '',
-    address: '',
-    membershipType: 'standard',
+    role: 'member',
   });
+  const { user, token } = useAuth();
+  const router = useRouter();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit(formData);
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/members`, formData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      onSubmit(response.data);
+    } catch (err) {
+      console.error('Error adding member:', err);
+      alert(err.response?.data?.message || 'Failed to add member');
+    }
   };
 
   const handleChange = (e) => {
@@ -55,47 +73,18 @@ function MemberForm({ member, onSubmit }) {
       </div>
 
       <div>
-        <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-          Phone Number
-        </label>
-        <input
-          type="tel"
-          name="phone"
-          id="phone"
-          value={formData.phone}
-          onChange={handleChange}
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-        />
-      </div>
-
-      <div>
-        <label htmlFor="address" className="block text-sm font-medium text-gray-700">
-          Address
-        </label>
-        <textarea
-          name="address"
-          id="address"
-          rows="3"
-          value={formData.address}
-          onChange={handleChange}
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-        ></textarea>
-      </div>
-
-      <div>
-        <label htmlFor="membershipType" className="block text-sm font-medium text-gray-700">
-          Membership Type
+        <label htmlFor="role" className="block text-sm font-medium text-gray-700">
+          Role
         </label>
         <select
-          name="membershipType"
-          id="membershipType"
-          value={formData.membershipType}
+          name="role"
+          id="role"
+          value={formData.role}
           onChange={handleChange}
           className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
         >
-          <option value="standard">Standard</option>
-          <option value="premium">Premium</option>
-          <option value="student">Student</option>
+          <option value="member">Member</option>
+          <option value="admin">Admin</option>
         </select>
       </div>
 

@@ -1,19 +1,37 @@
 import { useState } from 'react';
+import axios from 'axios';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/router';
+
+const API_BASE_URL = 'http://localhost:4000/api';
 
 function BookForm({ book, onSubmit }) {
   const [formData, setFormData] = useState(book || {
     title: '',
     author: '',
     isbn: '',
-    copies: 1,
     description: '',
     category: '',
-    publishedYear: '',
   });
+  const { user, token } = useAuth();
+  const router = useRouter();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit(formData);
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/books`, formData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      onSubmit(response.data);
+    } catch (err) {
+      console.error('Error adding book:', err);
+      alert(err.response?.data?.message || 'Failed to add book');
+    }
   };
 
   const handleChange = (e) => {
@@ -66,22 +84,6 @@ function BookForm({ book, onSubmit }) {
           id="isbn"
           required
           value={formData.isbn}
-          onChange={handleChange}
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-        />
-      </div>
-
-      <div>
-        <label htmlFor="copies" className="block text-sm font-medium text-gray-700">
-          Number of Copies
-        </label>
-        <input
-          type="number"
-          name="copies"
-          id="copies"
-          min="1"
-          required
-          value={formData.copies}
           onChange={handleChange}
           className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
         />

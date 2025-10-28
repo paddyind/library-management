@@ -2,8 +2,8 @@ import { Controller, Get, Post, Body, Param, Patch, Delete, UseGuards, Req, Quer
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { BooksService } from './books.service';
 import { CreateBookDto, UpdateBookDto } from '../dto/book.dto';
-import { Book } from '../models/book.entity';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Book } from '../books/book.interface';
+import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 import type { Request } from 'express';
 
 @ApiTags('Books')
@@ -28,7 +28,7 @@ export class BooksController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(SupabaseAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create new book', description: 'Add a new book to the catalog (requires authentication)' })
   @ApiBody({ type: CreateBookDto })
@@ -36,12 +36,12 @@ export class BooksController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 400, description: 'Invalid input' })
   create(@Body() createBookDto: CreateBookDto, @Req() req: Request): Promise<Book> {
-    const userId = (req.user as any).id;
+    const userId = (req as any).user.id;
     return this.booksService.create(createBookDto, userId);
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(SupabaseAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update book', description: 'Update book details (requires authentication)' })
   @ApiBody({ type: UpdateBookDto })
@@ -53,7 +53,7 @@ export class BooksController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(SupabaseAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete book', description: 'Remove a book from the catalog (requires authentication)' })
   @ApiResponse({ status: 200, description: 'Book deleted successfully' })
