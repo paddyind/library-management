@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import axios from 'axios';
 import Layout from '../src/components/layout/Layout.js';
 
@@ -63,10 +64,8 @@ export default function SearchPage() {
               <p className="text-gray-500 text-lg">No results found for "{q}"</p>
               <p className="text-gray-400 mt-2">Try searching with different keywords</p>
               <div className="mt-6">
-                <Link href="/request-book">
-                  <a className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700">
-                    Request a Book
-                  </a>
+                <Link href="/request-book" className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700">
+                  Request a Book
                 </Link>
               </div>
             </div>

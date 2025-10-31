@@ -7,7 +7,7 @@ import { BooksModule } from './books/books.module';
 import { GroupsModule } from './groups/groups.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { ProfileModule } from './profile/profile.module';
-import { NotificationsModule } from './notifications/notifications.module';
+// import { NotificationsModule } from './notifications/notifications.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { BookRequestsModule } from './book-requests/book-requests.module';
@@ -25,7 +25,7 @@ import { BookRequestsModule } from './book-requests/book-requests.module';
     GroupsModule,
     ReservationsModule,
     ProfileModule,
-    NotificationsModule,
+    // NotificationsModule,
     SubscriptionsModule,
     TransactionsModule,
   ],

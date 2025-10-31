@@ -1,13 +1,10 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Req } from '@nestjs/common';
 import { SearchService } from './search.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { MemberRole } from '../models/member.entity';
-
-import { Req } from '@nestjs/common';
+import { MemberRole, Member } from '../members/member.interface';
 import type { Request } from 'express';
-import { Member } from 'src/models/member.entity';
 
 @Controller('search')
 export class SearchController {

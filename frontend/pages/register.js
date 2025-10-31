@@ -28,7 +28,9 @@ export default function Register() {
     setLoading(true);
 
     try {
-      await axios.post(`${API_BASE_URL}/auth/register`, formData);
+      // Only send name, email, password - backend doesn't use subscription yet
+      const { name, email, password } = formData;
+      await axios.post(`${API_BASE_URL}/auth/register`, { name, email, password });
       // Redirect to login page on success
       router.push('/login?registered=true');
     } catch (err) {

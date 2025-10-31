@@ -37,7 +37,7 @@ export class LoansService {
       throw new Error(countError.message);
     }
 
-    if (count >= plan.lendingLimit) {
+    if (count !== null && count >= plan.lendingLimit) {
       throw new ConflictException('You have reached your borrowing limit.');
     }
 

@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { MemberRole, Member } from '../models/member.entity';
+import { MemberRole, Member } from '../members/member.interface';
 import { TransactionsService } from './transactions.service';
 import type { Request } from 'express';
 

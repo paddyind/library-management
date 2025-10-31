@@ -50,12 +50,23 @@ A modern, full-stack library management system with **anonymous book browsing** 
    cd library-management
    ```
 
-2. **Start the application**
+2. **Configure for your network** (Optional)
+   
+   If you're on a corporate network with a proxy:
+   ```bash
+   # Copy the template and edit with your proxy settings
+   cp docker-compose.override.template.yml docker-compose.override.yml
+   # Edit docker-compose.override.yml with your proxy details
+   ```
+   
+   For detailed network configuration, see [CORPORATE_NETWORK.md](CORPORATE_NETWORK.md)
+
+3. **Start the application**
    ```bash
    docker compose up -d
    ```
 
-3. **Access the application**
+4. **Access the application**
    - **Frontend**: http://localhost:3100
    - **Backend API**: http://localhost:4000/api
    - **Swagger API Docs**: http://localhost:4000/api-docs
@@ -64,6 +75,8 @@ A modern, full-stack library management system with **anonymous book browsing** 
    - Click "Register" on the welcome page
    - Fill in your details
    - Start browsing and borrowing books!
+
+> **Note**: For production deployment with Supabase database, see [PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md)
 
 ### Test Credentials
 ```
@@ -120,6 +133,8 @@ These routes require admin role and redirect non-admins to home page:
 ## 📚 Documentation
 
 - **[Architecture](ARCHITECTURE.md)** - System architecture and design decisions
+- **[Production Deployment](PRODUCTION_DEPLOYMENT.md)** - Deploy with Supabase database
+- **[Corporate Network](CORPORATE_NETWORK.md)** - Configure proxy for corporate environments
 - **[Changelog](CHANGELOG.md)** - Version history and updates
 - **[API Documentation](http://localhost:4000/api-docs)** - Interactive Swagger/OpenAPI documentation (when server is running)
 

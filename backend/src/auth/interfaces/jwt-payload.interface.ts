@@ -1,4 +1,4 @@
-import { MemberRole } from '../../models/member.entity';
+import { MemberRole } from '../../members/member.interface';
 
 export interface JwtPayload {
   email: string;

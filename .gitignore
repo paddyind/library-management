@@ -18,6 +18,11 @@ backend/build/
 .env.test.local
 .env.production.local
 
+# Corporate/Local Configuration (DO NOT COMMIT)
+docker-compose.override.yml
+docker-compose.corporate.yml
+.corporate.env
+
 # Logs
 npm-debug.log*
 yarn-debug.log*

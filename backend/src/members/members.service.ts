@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { SupabaseService } from '../config/supabase.service';
 import { CreateMemberDto, UpdateMemberDto } from '../dto/member.dto';
 import { Member, MemberRole } from './member.interface';
+import { mockUsers } from '../auth/auth.service';
 
 @Injectable()
 export class MembersService {
@@ -28,6 +29,10 @@ export class MembersService {
 
     if (authError) {
       throw new Error(authError.message);
+    }
+
+    if (!authData.user) {
+      throw new Error('Failed to create user');
     }
 
     const { data, error } = await this.supabaseService
@@ -60,18 +65,45 @@ export class MembersService {
   }
 
   async findOne(id: string): Promise<Member> {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('members')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      throw new NotFoundException(`Member with ID "${id}" not found`);
+    // Return mock data if Supabase is not configured
+    if (!this.supabaseService.isReady()) {
+      const user = mockUsers.find(u => u.id === id);
+      if (!user) {
+        throw new NotFoundException(`Member with ID "${id}" not found`);
+      }
+      // Remove password from response
+      const { password, ...member } = user;
+      return member as Member;
     }
 
-    return data;
+    try {
+      const { data, error } = await this.supabaseService
+        .getClient()
+        .from('members')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        console.warn('⚠️ Supabase query error, falling back to mock data:', error.message);
+        const user = mockUsers.find(u => u.id === id);
+        if (!user) {
+          throw new NotFoundException(`Member with ID "${id}" not found`);
+        }
+        const { password, ...member } = user;
+        return member as Member;
+      }
+
+      return data;
+    } catch (error) {
+      console.warn('⚠️ Supabase connection failed, falling back to mock data');
+      const user = mockUsers.find(u => u.id === id);
+      if (!user) {
+        throw new NotFoundException(`Member with ID "${id}" not found`);
+      }
+      const { password, ...member } = user;
+      return member as Member;
+    }
   }
 
   async findByEmail(email: string): Promise<Member | undefined> {

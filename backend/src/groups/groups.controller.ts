@@ -1,11 +1,11 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { GroupsService } from './groups.service';
 import { CreateGroupDto, UpdateGroupDto, AddMemberDto } from '../dto/create-group.dto';
-import { Group } from '../models/group.entity';
+import { Group } from './group.interface';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
-import { MemberRole } from '../models/member.entity';
+import { MemberRole } from '../members/member.interface';
 
 @Controller('groups')
 @UseGuards(JwtAuthGuard, RolesGuard)

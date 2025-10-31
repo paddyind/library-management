@@ -1,5 +1,7 @@
 version: '3.8'
 
+name: library-management
+
 services:
   frontend:
     build:
@@ -12,6 +14,13 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:4000/api}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
     depends_on:
       - backend
     networks:
@@ -19,6 +28,11 @@ services:
     restart: unless-stopped
     labels:
       - "com.docker.compose.project=library-management"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   backend:
     build:
@@ -28,13 +42,29 @@ services:
       - "4000:4000"
     volumes:
       - ./data:/app/data
+      - backend_logs:/app/logs
     environment:
       - NODE_ENV=production
+      - PORT=4000
       - SQLITE_PATH=/app/data/library.sqlite
       - JWT_SECRET=${JWT_SECRET}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3100}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
     networks:
       - library-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4000/api/books"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   nginx:
     build:
@@ -51,7 +81,16 @@ services:
     networks:
       - library-network
     restart: unless-stopped
+    labels:
+      - "com.docker.compose.project=library-management"
 
 networks:
   library-network:
+    name: library-management
     driver: bridge
+    labels:
+      - "com.docker.compose.project=library-management"
+
+volumes:
+  backend_logs:
+    name: library-management-backend-logs

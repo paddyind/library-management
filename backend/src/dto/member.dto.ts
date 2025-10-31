@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsString, IsOptional, MinLength, IsEnum } from 'class-validator';
-import { SubscriptionTier } from '../models/subscription.entity';
+import { SubscriptionTier } from '../subscriptions/subscription.interface';
 
 export class CreateMemberDto {
   @ApiProperty({ example: 'John Doe' })

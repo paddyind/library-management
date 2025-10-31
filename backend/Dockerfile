@@ -2,7 +2,7 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install system dependencies for sqlite3
+# Install system dependencies for sqlite3 and SSL/TLS support
 RUN apk add --no-cache \
     python3 \
     py3-pip \
@@ -10,7 +10,12 @@ RUN apk add --no-cache \
     make \
     g++ \
     sqlite \
-    sqlite-dev
+    sqlite-dev \
+    ca-certificates \
+    openssl
+
+# Update CA certificates
+RUN update-ca-certificates
 
 # Install node dependencies
 COPY package*.json ./
