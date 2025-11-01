@@ -19,6 +19,14 @@ export class BooksController {
     return this.booksService.findAll(search);
   }
 
+  @Get('search')
+  @ApiOperation({ summary: 'Search books', description: 'Search books by query parameter (public access)' })
+  @ApiQuery({ name: 'q', required: false, description: 'Search query for title, author, or ISBN' })
+  @ApiResponse({ status: 200, description: 'List of matching books' })
+  search(@Query('q') query?: string): Promise<Book[]> {
+    return this.booksService.findAll(query);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get book by ID', description: 'Retrieve a single book by its ID (public access)' })
   @ApiResponse({ status: 200, description: 'Book found' })

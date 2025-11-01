@@ -16,14 +16,73 @@ function Dashboard() {
     totalMembers: 0,
     activeLoans: 0,
   });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
+      return;
+    }
+
+    if (user) {
+      fetchStats();
     }
   }, [user, authLoading, router]);
 
-  if (authLoading || !user) {
+  const fetchStats = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const userRole = user?.role?.toLowerCase();
+      const isAdmin = userRole === 'admin';
+      const isLibrarian = userRole === 'librarian';
+      
+      // Fetch stats based on user role
+      const [booksRes, membersRes, transactionsRes] = await Promise.allSettled([
+        axios.get(`${API_BASE_URL}/books`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }),
+        // Only fetch users list if admin or librarian
+        (token && (isAdmin || isLibrarian)) ? axios.get(`${API_BASE_URL}/users`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => axios.get(`${API_BASE_URL}/members`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })) : Promise.resolve({ value: { data: [] } }),
+        // Use correct transactions endpoint based on role
+        token ? (isAdmin 
+          ? axios.get(`${API_BASE_URL}/transactions`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => Promise.resolve({ data: [] }))
+          : axios.get(`${API_BASE_URL}/transactions/my-transactions`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => Promise.resolve({ data: [] }))
+        ) : Promise.resolve({ data: [] }),
+      ]);
+
+      const books = booksRes.status === 'fulfilled' ? (booksRes.value.data || []) : [];
+      const members = membersRes.status === 'fulfilled' ? (membersRes.value.data || []) : [];
+      const transactions = transactionsRes.status === 'fulfilled' ? (transactionsRes.value.data || []) : [];
+
+      // Calculate active loans (transactions without returnDate)
+      const activeLoans = Array.isArray(transactions) 
+        ? transactions.filter(t => t && !t.returnDate).length 
+        : 0;
+
+      setStats({
+        totalBooks: Array.isArray(books) ? books.length : 0,
+        availableBooks: Array.isArray(books) ? books.length : 0, // TODO: Add status field to books
+        totalMembers: Array.isArray(members) ? members.length : 0,
+        activeLoans: activeLoans,
+      });
+    } catch (err) {
+      console.error('Failed to fetch stats:', err);
+      // Keep default values (0)
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (authLoading || loading) {
     return (
       <Layout>
         <div className="flex justify-center items-center h-64">
@@ -31,6 +90,10 @@ function Dashboard() {
         </div>
       </Layout>
     );
+  }
+
+  if (!user) {
+    return null;
   }
 
   return (
@@ -60,7 +123,7 @@ function Dashboard() {
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Total Books</dt>
                       <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">150</div>
+                        <div className="text-2xl font-semibold text-gray-900">{stats.totalBooks}</div>
                       </dd>
                     </dl>
                   </div>
@@ -80,7 +143,7 @@ function Dashboard() {
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Available</dt>
                       <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">120</div>
+                        <div className="text-2xl font-semibold text-gray-900">{stats.availableBooks}</div>
                       </dd>
                     </dl>
                   </div>
@@ -100,7 +163,7 @@ function Dashboard() {
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Members</dt>
                       <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">50</div>
+                        <div className="text-2xl font-semibold text-gray-900">{stats.totalMembers}</div>
                       </dd>
                     </dl>
                   </div>
@@ -120,7 +183,7 @@ function Dashboard() {
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Active Loans</dt>
                       <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">30</div>
+                        <div className="text-2xl font-semibold text-gray-900">{stats.activeLoans}</div>
                       </dd>
                     </dl>
                   </div>
@@ -165,9 +228,9 @@ function Dashboard() {
                 </div>
               </a>
 
-              {user.role === 'Admin' && (
+              {(user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'librarian') && (
                 <a
-                  href="/admin/users"
+                  href="/users"
                   className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500"
                 >
                   <div className="flex-shrink-0">
@@ -178,7 +241,7 @@ function Dashboard() {
                   <div className="flex-1 min-w-0">
                     <span className="absolute inset-0" aria-hidden="true" />
                     <p className="text-sm font-medium text-gray-900">Manage Users</p>
-                    <p className="text-sm text-gray-500 truncate">Admin panel</p>
+                    <p className="text-sm text-gray-500 truncate">{user.role?.toLowerCase() === 'admin' ? 'Admin panel' : 'View users'}</p>
                   </div>
                 </a>
               )}

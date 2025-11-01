@@ -14,8 +14,10 @@ export default function WelcomePage() {
   const router = useRouter();
 
   useEffect(() => {
+    // Fetch books only once on component mount
     fetchBooks();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - only fetch once
 
   useEffect(() => {
     if (searchQuery) {
@@ -31,12 +33,17 @@ export default function WelcomePage() {
   }, [searchQuery, books]);
 
   const fetchBooks = async () => {
+    // Prevent multiple simultaneous fetches
+    if (loading) return;
+    
     try {
       setLoading(true);
       // Try to fetch books without authentication (public endpoint)
-      const response = await axios.get(`${API_BASE_URL}/books`);
-      setBooks(response.data);
-      setFilteredBooks(response.data);
+      const response = await axios.get(`${API_BASE_URL}/books`, {
+        timeout: 10000, // 10 second timeout
+      });
+      setBooks(Array.isArray(response.data) ? response.data : []);
+      setFilteredBooks(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error('Failed to fetch books:', err);
       // Show sample books if API fails

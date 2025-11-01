@@ -17,10 +17,14 @@ async function bootstrap() {
   app.use(helmet());
   app.use(compression());
   
-  // CORS
+  // CORS - Optimized to reduce preflight requests
   app.enableCors({
     origin: process.env.CORS_ORIGIN || 'http://localhost:3100',
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    exposedHeaders: ['Content-Type'],
+    maxAge: 86400, // Cache preflight for 24 hours
   });
 
   // Global validation pipe

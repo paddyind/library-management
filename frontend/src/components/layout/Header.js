@@ -1,15 +1,101 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BellIcon, UserCircleIcon, MenuIcon } from '@heroicons/react/outline';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../contexts/AuthContext';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 export default function Header({ onMenuButtonClick }) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [unreadCount, setUnreadCount] = useState(0);
   const router = useRouter();
   const { user, logout } = useAuth();
+
+  // Fetch unread notification count - optimized to reduce API calls
+  // Only polls when page is visible and user is authenticated
+  // Reduced polling frequency from 60s to 5 minutes to minimize server load
+  useEffect(() => {
+    if (!user) {
+      setUnreadCount(0);
+      return;
+    }
+
+    let isMounted = true;
+    let intervalId = null;
+    const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes instead of 60 seconds
+
+    const fetchUnreadCount = async () => {
+      // Skip if page is not visible (browser tab in background)
+      if (document.hidden) {
+        return;
+      }
+
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          if (isMounted) setUnreadCount(0);
+          return;
+        }
+
+        const response = await axios.get(`${API_BASE_URL}/notifications/unread-count`, {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000, // 5 second timeout
+        });
+        if (isMounted) setUnreadCount(response.data || 0);
+      } catch (err) {
+        // Silently fail - no notifications available
+        if (isMounted) setUnreadCount(0);
+        // Only log errors in development to reduce console noise
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Failed to fetch unread notifications:', err);
+        }
+      }
+    };
+
+    // Initial fetch only when component mounts
+    fetchUnreadCount();
+
+    // Poll at intervals only when page is visible
+    const startPolling = () => {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(() => {
+        if (isMounted && !document.hidden) {
+          fetchUnreadCount();
+        }
+      }, POLL_INTERVAL);
+    };
+
+    // Handle page visibility changes - stop polling when tab is inactive
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Stop polling when page is hidden
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+      } else {
+        // Resume polling when page becomes visible, and fetch immediately
+        fetchUnreadCount();
+        startPolling();
+      }
+    };
+
+    // Start polling
+    startPolling();
+
+    // Listen to page visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      isMounted = false;
+      if (intervalId) clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user]);
 
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
@@ -90,7 +176,11 @@ export default function Header({ onMenuButtonClick }) {
                 <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
-                <span className="absolute top-1.5 right-1.5 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white"></span>
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 flex items-center justify-center h-5 w-5 text-xs font-bold text-white bg-red-500 rounded-full ring-2 ring-white">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </button>
               
               {notificationsOpen && (
@@ -100,40 +190,40 @@ export default function Header({ onMenuButtonClick }) {
                       <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
                     </div>
                     <div className="max-h-96 overflow-y-auto">
-                      <div className="px-4 py-3 hover:bg-gray-50 transition-colors duration-200">
-                        <div className="flex items-start">
-                          <div className="flex-shrink-0">
-                            <svg className="h-6 w-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </div>
-                          <div className="ml-3">
-                            <p className="text-sm font-medium text-gray-900">Book return overdue</p>
-                            <p className="text-xs text-gray-500 mt-0.5">2 hours ago</p>
-                          </div>
+                      {unreadCount === 0 ? (
+                        <div className="px-4 py-8 text-center text-gray-500 text-sm">
+                          No new notifications
                         </div>
-                      </div>
-                      <div className="px-4 py-3 hover:bg-gray-50 transition-colors duration-200">
-                        <div className="flex items-start">
-                          <div className="flex-shrink-0">
-                            <svg className="h-6 w-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                            </svg>
-                          </div>
-                          <div className="ml-3">
-                            <p className="text-sm font-medium text-gray-900">New member registration</p>
-                            <p className="text-xs text-gray-500 mt-0.5">1 day ago</p>
-                          </div>
+                      ) : (
+                        <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                          You have {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
                         </div>
-                      </div>
+                      )}
                     </div>
                     <div className="px-4 py-2 border-t border-gray-100 flex justify-between items-center">
                       <Link href="/notifications" className="text-sm font-medium text-primary-600 hover:text-primary-500">
                         All Notifications
                       </Link>
-                      <button className="text-sm font-medium text-gray-500 hover:text-gray-700">
-                        Clear
-                      </button>
+                      {unreadCount > 0 && (
+                        <button 
+                          onClick={async () => {
+                            try {
+                              const token = localStorage.getItem('token');
+                              if (token) {
+                                await axios.post(`${API_BASE_URL}/notifications/mark-all-read`, {}, {
+                                  headers: { Authorization: `Bearer ${token}` },
+                                });
+                                setUnreadCount(0);
+                              }
+                            } catch (err) {
+                              console.error('Failed to mark all as read:', err);
+                            }
+                          }}
+                          className="text-sm font-medium text-gray-500 hover:text-gray-700"
+                        >
+                          Mark all as read
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

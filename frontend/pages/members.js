@@ -1,42 +1,26 @@
-import { useState } from 'react';
+import { useRouter } from 'next/router';
+import { useEffect } from 'react';
 import Layout from '../src/components/layout/Layout.js';
-import MemberList from '../src/components/members/MemberList.js';
-import MemberForm from '../src/components/members/MemberForm.js';
-import { withAdminAuth } from '../src/components/withAuth';
 
+/**
+ * Members page - Redirects to Users page
+ * This page is kept for backward compatibility but redirects to /users
+ */
 function MembersPage() {
-  const [isAddingMember, setIsAddingMember] = useState(false);
+  const router = useRouter();
 
-  const handleAddMember = (memberData) => {
-    // TODO: Implement member addition logic
-    console.log('Adding member:', memberData);
-    setIsAddingMember(false);
-  };
+  useEffect(() => {
+    // Redirect to users page
+    router.replace('/users');
+  }, [router]);
 
   return (
     <Layout>
-      <div className="py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {isAddingMember ? (
-            <div>
-              <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-semibold text-gray-900">Add New Member</h1>
-                <button
-                  onClick={() => setIsAddingMember(false)}
-                  className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
-                >
-                  Cancel
-                </button>
-              </div>
-              <MemberForm onSubmit={handleAddMember} />
-            </div>
-          ) : (
-            <MemberList onAddClick={() => setIsAddingMember(true)} />
-          )}
-        </div>
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     </Layout>
   );
 }
 
-export default withAdminAuth(MembersPage);
+export default MembersPage;

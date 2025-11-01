@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
  * Usage: export default withAuth(YourComponent);
  */
 export function withAuth(Component, options = {}) {
-  const { requireRole = null } = options;
+  const { requireRole = null, requireRoles = null } = options;
 
   return function ProtectedRoute(props) {
     const { user, loading } = useAuth();
@@ -25,8 +25,13 @@ export function withAuth(Component, options = {}) {
       }
 
       // Check role requirement if specified
-      if (requireRole && user.role !== requireRole) {
-        router.push('/dashboard'); // Redirect to dashboard if wrong role
+      const allowedRoles = requireRoles || (requireRole ? [requireRole] : null);
+      if (allowedRoles && allowedRoles.length > 0) {
+        const userRole = user.role?.toLowerCase();
+        const hasAccess = allowedRoles.some(role => role.toLowerCase() === userRole);
+        if (!hasAccess) {
+          router.push('/dashboard'); // Redirect to dashboard if wrong role
+        }
       }
     }, [user, loading, router]);
 
@@ -45,8 +50,13 @@ export function withAuth(Component, options = {}) {
     }
 
     // Check role requirement
-    if (requireRole && user.role !== requireRole) {
-      return null;
+    const allowedRoles = requireRoles || (requireRole ? [requireRole] : null);
+    if (allowedRoles && allowedRoles.length > 0) {
+      const userRole = user.role?.toLowerCase();
+      const hasAccess = allowedRoles.some(role => role.toLowerCase() === userRole);
+      if (!hasAccess) {
+        return null;
+      }
     }
 
     // Render the protected component
@@ -56,11 +66,16 @@ export function withAuth(Component, options = {}) {
 
 // Convenience exports for specific roles
 export function withAdminAuth(Component) {
-  return withAuth(Component, { requireRole: 'ADMIN' });
+  return withAuth(Component, { requireRole: 'admin' });
+}
+
+// Allow admin or librarian to view (librarians can view but not edit)
+export function withAdminOrLibrarianAuth(Component) {
+  return withAuth(Component, { requireRoles: ['admin', 'librarian'] });
 }
 
 export function withMemberAuth(Component) {
-  return withAuth(Component, { requireRole: 'MEMBER' });
+  return withAuth(Component, { requireRole: 'member' });
 }
 
 // Default export for convenience

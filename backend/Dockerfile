@@ -21,11 +21,16 @@ RUN update-ca-certificates
 COPY package*.json ./
 RUN npm install
 
-# Rebuild sqlite3 for Alpine Linux
-RUN npm rebuild sqlite3 --build-from-source
-
-# Copy source code
+# Copy source code first
 COPY . .
+
+# Create scripts directory if it doesn't exist (for test scripts)
+RUN mkdir -p scripts
+
+# Rebuild better-sqlite3 for Alpine Linux after source code is copied
+# This ensures the native module is compiled for the correct architecture
+RUN npm rebuild better-sqlite3 --build-from-source || \
+    (echo "Warning: Failed to rebuild better-sqlite3, will retry at runtime" && true)
 
 EXPOSE 4000
 

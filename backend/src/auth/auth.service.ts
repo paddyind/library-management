@@ -1,42 +1,49 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SupabaseService } from '../config/supabase.service';
+import { SqliteService } from '../config/sqlite.service';
 import { SignUpDto } from './dto/signup.dto';
 import { SignInDto } from './dto/signin.dto';
 import * as jwt from 'jsonwebtoken';
 import { MemberRole } from '../members/member.interface';
 
-// In-memory user store for demo purposes
-// TODO: Replace with actual database storage
-export const mockUsers = [
-  {
-    id: 'user-1',
-    email: 'admin@library.com',
-    password: 'admin123', // In production, this would be hashed
-    name: 'Admin User',
-    role: MemberRole.ADMIN,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: 'user-2',
-    email: 'user@library.com',
-    password: 'user123',
-    name: 'Regular User',
-    role: MemberRole.MEMBER,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-];
-
 @Injectable()
 export class AuthService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly sqliteService: SqliteService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  private getPreferredStorage(): 'supabase' | 'sqlite' {
+    const storagePreference = this.configService.get<string>('AUTH_STORAGE', 'auto').toLowerCase();
+    
+    // Force SQLite if explicitly configured
+    if (storagePreference === 'sqlite') {
+      return 'sqlite';
+    }
+    
+    // Force Supabase if explicitly configured (even if health check failed)
+    if (storagePreference === 'supabase') {
+      return 'supabase';
+    }
+    
+    // Auto mode (default): Use Supabase ONLY if health check passed at startup
+    // Once health check is done, stick with the decision for the session
+    if (this.supabaseService.isReady()) {
+      return 'supabase';
+    }
+    
+    // Default to SQLite if Supabase health check failed or not configured
+    return 'sqlite';
+  }
 
   async signUp(signUpDto: SignUpDto) {
-    const { email, password } = signUpDto;
+    const { email, password, name } = signUpDto;
+    const storage = this.getPreferredStorage();
     
-    // Check if Supabase is configured and try to use it
-    if (this.supabaseService.isReady()) {
+    // Try Supabase first if preferred (health check passed at startup)
+    if (storage === 'supabase') {
       try {
         const { data, error } = await this.supabaseService.getClient().auth.signUp({
           email,
@@ -44,65 +51,102 @@ export class AuthService {
         });
 
         if (error) {
-          console.warn('⚠️ Supabase signup error, falling back to mock registration:', error.message);
-          return this.mockSignUp(signUpDto);
+          console.warn('⚠️ Supabase signup error, falling back to SQLite:', error.message);
+          return this.sqliteSignUp(signUpDto);
         }
 
         console.log('✅ Supabase registration successful for:', email);
-        return data;
-      } catch (error) {
-        console.warn('⚠️ Supabase connection failed, falling back to mock registration:', error.message);
-        return this.mockSignUp(signUpDto);
+        
+        // Generate JWT token from Supabase user
+        const token = this.generateToken({
+          id: data.user?.id || '',
+          email: data.user?.email || email,
+          name: name || email.split('@')[0],
+          role: MemberRole.MEMBER,
+        });
+
+        return {
+          access_token: token,
+          user: {
+            id: data.user?.id || '',
+            email: data.user?.email || email,
+            name: name || email.split('@')[0],
+            role: MemberRole.MEMBER,
+          },
+        };
+      } catch (error: any) {
+        // Check for DNS/network errors and fallback immediately
+        if (error.message === 'DNS_RESOLUTION_FAILED' || 
+            error.code === 'EAI_AGAIN' || 
+            error.code === 'ENOTFOUND' ||
+            error.message?.includes('getaddrinfo')) {
+          console.warn('⚠️ Supabase DNS/network error detected, immediately falling back to SQLite');
+        } else {
+          console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
+        }
+        return this.sqliteSignUp(signUpDto);
       }
     }
 
-    // Use mock registration if Supabase not configured
-    return this.mockSignUp(signUpDto);
+    // Use SQLite registration (either forced or as fallback)
+    return this.sqliteSignUp(signUpDto);
   }
 
-  private mockSignUp(signUpDto: SignUpDto) {
-    const { email, password } = signUpDto;
+  private sqliteSignUp(signUpDto: SignUpDto) {
+    const { email, password, name } = signUpDto;
     
-    console.log('📝 Mock registration:', email);
-    
-    // Check if user already exists
-    const existingUser = mockUsers.find(u => u.email === email);
-    if (existingUser) {
-      throw new ConflictException('User with this email already exists');
+    if (!this.sqliteService.isReady()) {
+      throw new Error('SQLite database is not available');
     }
 
-    // Create new user
-    const newUser = {
-      id: `user-${Date.now()}`,
-      email,
-      password, // In production, hash this!
-      name: signUpDto.name || email.split('@')[0],
-      role: MemberRole.MEMBER,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    console.log('📝 SQLite registration:', email);
+    
+    try {
+      // Check if user already exists
+      const existingUser = this.sqliteService.findUserByEmail(email);
+      if (existingUser) {
+        throw new ConflictException('User with this email already exists');
+      }
 
-    mockUsers.push(newUser);
+      // Create new user in SQLite
+      const newUser = this.sqliteService.createUser({
+        email,
+        password,
+        name: name || email.split('@')[0],
+        role: MemberRole.MEMBER,
+      });
 
-    // Generate JWT token
-    const token = this.generateToken(newUser);
-
-    return {
-      access_token: token,
-      user: {
+      // Generate JWT token
+      const token = this.generateToken({
         id: newUser.id,
         email: newUser.email,
         name: newUser.name,
-        role: newUser.role,
-      },
-    };
+        role: newUser.role as MemberRole,
+      });
+
+      return {
+        access_token: token,
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          name: newUser.name,
+          role: newUser.role,
+        },
+      };
+    } catch (error: any) {
+      if (error instanceof ConflictException) {
+        throw error;
+      }
+      throw new Error(`Failed to create user: ${error.message}`);
+    }
   }
 
   async signIn(signInDto: SignInDto) {
     const { email, password } = signInDto;
+    const storage = this.getPreferredStorage();
 
-    // Check if Supabase is configured and try to use it
-    if (this.supabaseService.isReady()) {
+    // Try Supabase first if preferred (health check passed at startup)
+    if (storage === 'supabase') {
       try {
         const { data, error } = await this.supabaseService.getClient().auth.signInWithPassword({
           email,
@@ -110,37 +154,89 @@ export class AuthService {
         });
 
         if (error) {
-          console.warn('⚠️ Supabase auth error, falling back to mock authentication:', error.message);
-          return this.mockSignIn(email, password);
+          console.warn('⚠️ Supabase auth error, falling back to SQLite:', error.message);
+          return this.sqliteSignIn(email, password);
         }
 
         console.log('✅ Supabase authentication successful for:', email);
-        return data;
-      } catch (error) {
-        console.warn('⚠️ Supabase connection failed, falling back to mock authentication:', error.message);
-        return this.mockSignIn(email, password);
+        
+        // Generate JWT token from Supabase user
+        const token = this.generateToken({
+          id: data.user?.id || '',
+          email: data.user?.email || email,
+          name: data.user?.user_metadata?.name || email.split('@')[0],
+          role: MemberRole.MEMBER,
+        });
+
+        return {
+          access_token: token,
+          user: {
+            id: data.user?.id || '',
+            email: data.user?.email || email,
+            name: data.user?.user_metadata?.name || email.split('@')[0],
+            role: MemberRole.MEMBER,
+          },
+        };
+      } catch (error: any) {
+        // Check for DNS/network errors and fallback immediately
+        if (error.message === 'DNS_RESOLUTION_FAILED' || 
+            error.code === 'EAI_AGAIN' || 
+            error.code === 'ENOTFOUND' ||
+            error.message?.includes('getaddrinfo')) {
+          console.warn('⚠️ Supabase DNS/network error detected, immediately falling back to SQLite');
+        } else {
+          console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
+        }
+        return this.sqliteSignIn(email, password);
       }
     }
 
-    // Use mock authentication if Supabase not configured
-    return this.mockSignIn(email, password);
+    // Use SQLite authentication (either forced or as fallback)
+    return this.sqliteSignIn(email, password);
   }
 
-  private mockSignIn(email: string, password: string) {
-    console.log('🔐 Mock login attempt:', email);
-    console.log('🔐 Password received:', password);
-    console.log('🔐 Available mock users:', mockUsers.map(u => ({ email: u.email, password: u.password })));
+  private sqliteSignIn(email: string, password: string) {
+    if (!this.sqliteService.isReady()) {
+      throw new Error('SQLite database is not available');
+    }
+
+    console.log('🔐 SQLite login attempt:', email);
     
-    const user = mockUsers.find(u => u.email === email && u.password === password);
+    const user = this.sqliteService.findUserByEmail(email);
     
     if (!user) {
-      console.log('❌ User not found or password mismatch');
+      console.log('❌ User not found:', email);
       throw new UnauthorizedException('Invalid email or password');
     }
+
+    // Verify password
+    const isPasswordValid = this.sqliteService.verifyPassword(password, user.password);
+    
+    if (!isPasswordValid) {
+      console.log('❌ Password mismatch for:', email);
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
     console.log('✅ Login successful for:', email);
 
+    // Normalize role to match MemberRole enum
+    const roleLower = user.role?.toLowerCase();
+    let normalizedRole: MemberRole;
+    if (roleLower === 'admin') {
+      normalizedRole = MemberRole.ADMIN;
+    } else if (roleLower === 'librarian') {
+      normalizedRole = MemberRole.LIBRARIAN;
+    } else {
+      normalizedRole = MemberRole.MEMBER;
+    }
+
     // Generate JWT token
-    const token = this.generateToken(user);
+    const token = this.generateToken({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: normalizedRole,
+    });
 
     return {
       access_token: token,

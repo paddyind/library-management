@@ -50,16 +50,44 @@ A modern, full-stack library management system with **anonymous book browsing** 
    cd library-management
    ```
 
-2. **Configure for your network** (Optional)
+2. **Set up environment variables**
    
-   If you're on a corporate network with a proxy:
+   Create a `.env` file in the project root (same directory as `docker-compose.yml`):
    ```bash
-   # Copy the template and edit with your proxy settings
-   cp docker-compose.override.template.yml docker-compose.override.yml
-   # Edit docker-compose.override.yml with your proxy details
+   cp .env.example .env
    ```
    
-   For detailed network configuration, see [CORPORATE_NETWORK.md](CORPORATE_NETWORK.md)
+   Then edit `.env` and add your Supabase credentials (if using Supabase):
+   ```bash
+   # Get these from: https://supabase.com/dashboard → Your Project → Settings → API
+   NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   
+   # Storage mode: auto (default), supabase, or sqlite
+   AUTH_STORAGE=auto
+   ```
+   
+   **Note**: The `.env` file is automatically gitignored and will not be committed to version control.
+   
+   **About authentication storage modes**:
+   - **Auto mode (default)**: Performs health check at startup
+     - If Supabase works → Uses Supabase for entire session
+     - If Supabase fails → Uses SQLite for entire session
+     - **One decision at startup, no repeated checks**
+   - **Supabase mode**: Force use of Supabase only (set `AUTH_STORAGE=supabase`)
+   - **SQLite mode**: Force use of SQLite only (set `AUTH_STORAGE=sqlite`)
+   
+   **Important**: Health check is performed once at server startup. If Supabase fails the health check, the system switches to SQLite for the entire session. Restart the server after fixing network/proxy issues to retest Supabase.
+   
+   For corporate networks with proxy, also add to `.env`:
+   ```bash
+   HTTP_PROXY=http://proxy.company.com:8080
+   HTTPS_PROXY=http://proxy.company.com:8080
+   NO_PROXY=localhost,127.0.0.1,*.local
+   ```
+   
+   See [SUPABASE_CONFIG.md](SUPABASE_CONFIG.md) for detailed configuration and troubleshooting.
 
 3. **Start the application**
    ```bash
@@ -76,20 +104,7 @@ A modern, full-stack library management system with **anonymous book browsing** 
    - Fill in your details
    - Start browsing and borrowing books!
 
-> **Note**: For production deployment with Supabase database, see [PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md)
-
-### Test Credentials
-```
-Admin User:
-  Email: admin@library.com
-  Password: password
-  Role: Admin
-
-Regular User:
-  Email: user@library.com
-  Password: password
-  Role: Member
-```
+> **Note**: The application will automatically use SQLite database for user authentication if Supabase is not configured or unavailable. Users are stored persistently in the SQLite database located at `data/library.sqlite`.
 
 ---
 
@@ -133,8 +148,9 @@ These routes require admin role and redirect non-admins to home page:
 ## 📚 Documentation
 
 - **[Architecture](ARCHITECTURE.md)** - System architecture and design decisions
-- **[Production Deployment](PRODUCTION_DEPLOYMENT.md)** - Deploy with Supabase database
-- **[Corporate Network](CORPORATE_NETWORK.md)** - Configure proxy for corporate environments
+- **[Database Modeling](DATABASE_MODELING.md)** - Complete database schema documentation
+- **[Database Management](backend/README_DATABASE.md)** - Database migrations, backups, and restore guide
+- **[Supabase Configuration](SUPABASE_CONFIG.md)** - Options for configuring Supabase database
 - **[Changelog](CHANGELOG.md)** - Version history and updates
 - **[API Documentation](http://localhost:4000/api-docs)** - Interactive Swagger/OpenAPI documentation (when server is running)
 
@@ -329,9 +345,9 @@ docker compose restart
 ```
 
 **Issue: "Invalid credentials" on login**
-- Use demo credentials: `admin@library.com` / `password` or `user@library.com` / `password`
-- Or register a new account
+- Register a new account to get started
 - Check backend is running: `docker compose logs backend`
+- If you see "Member with ID 'user-X' not found", log out and log in again (old session token)
 
 **Issue: Changes not reflecting**
 - Hard refresh browser: Ctrl+Shift+R (Windows/Linux) or Cmd+Shift+R (Mac)
@@ -394,18 +410,70 @@ DELETE /api/notifications         - Delete all notifications
 
 ## 🗄️ Database Seed
 
-The application comes with pre-seeded demo data for testing:
+The application comes with a seed script that supports both **Supabase** and **SQLite** databases:
 
 **Run the seed script:**
 ```bash
+# In Docker (will auto-detect Supabase or SQLite based on AUTH_STORAGE)
 docker compose exec backend npm run seed
+
+# Force SQLite mode
+AUTH_STORAGE=sqlite docker compose exec backend npm run seed
+
+# Force Supabase mode
+AUTH_STORAGE=supabase docker compose exec backend npm run seed
 ```
 
 **Seeded Data Includes:**
-- 2 Demo Users (admin & member)
-- 3 Groups (Administrators, Librarians, Members)
-- 12 Classic Books (with covers and various statuses)
-- 4 Sample Notifications
+- 2 Demo Users:
+  - `admin@library.com` (Admin role) - Password: `password`
+  - `member@library.com` (Member role) - Password: `password`
+- 5 Sample Books (The Great Gatsby, To Kill a Mockingbird, 1984, Pride and Prejudice, The Catcher in the Rye)
+- 3 Groups (Administrators, Librarians, Members) - Supabase only
+
+**Note:** The seed script automatically detects which database to use based on:
+- `AUTH_STORAGE` environment variable (`auto`, `sqlite`, or `supabase`)
+- Availability of Supabase credentials (if `auto` mode)
+
+If Supabase is not configured, it will automatically seed SQLite instead.
+
+---
+
+## 🧪 Testing
+
+### Sanity Test Suite
+
+The application includes a basic sanity test suite to verify core functionality:
+
+**Run tests in Docker:**
+```bash
+docker compose exec backend npm run test:sanity
+# OR
+docker compose exec backend node scripts/sanity-test.js
+```
+
+**Run tests locally (if backend is running):**
+```bash
+cd backend
+npm run test:sanity
+# OR
+node scripts/sanity-test.js
+```
+
+**What it tests:**
+- ✅ API connectivity and health
+- ✅ Database connectivity (SQLite/Supabase)
+- ✅ Public endpoints (books)
+- ✅ Authentication flow (register/login)
+- ✅ Protected endpoints (profile)
+- ✅ Basic CRUD operations (create/get books)
+- ✅ Search functionality
+
+**Test results:**
+- Tests pass: Exit code 0
+- Tests fail: Exit code 1 with detailed error messages
+
+The test suite is designed to be run as part of CI/CD pipelines or manually after deployments.
 
 ---
 

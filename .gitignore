@@ -17,11 +17,17 @@ backend/build/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.*.local
+*.env
 
 # Corporate/Local Configuration (DO NOT COMMIT)
 docker-compose.override.yml
 docker-compose.corporate.yml
 .corporate.env
+
+# Supabase credentials (DO NOT COMMIT)
+.env.supabase
+supabase.env
 
 # Logs
 npm-debug.log*

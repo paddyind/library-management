@@ -1,10 +1,42 @@
-````markdown
 # Changelog
 
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [v1.0.8] - 2025-11-XX
+
+### Added
+- **SQLite Fallback for Authentication**: Implemented SQLite as a fallback mechanism for user registration and login when Supabase is unavailable or failing
+  - New `SqliteService` with password hashing using bcryptjs
+  - Automatic database initialization with user table creation
+  - Configuration option `AUTH_STORAGE` to switch between `supabase`, `sqlite`, or `auto` mode
+  - Password hashing and verification for secure authentication
+  - Persistent user storage in SQLite database
+
+### Changed
+- **Authentication System**: Refactored authentication to use SQLite as fallback instead of in-memory mock users
+  - Removed all mock/dummy user accounts from code
+  - Updated `AuthService` to use SQLite when Supabase fails
+  - Updated `MembersService` to use SQLite fallback for user queries
+  - Improved error handling with automatic fallback between Supabase and SQLite
+- **Frontend Navigation**: Fixed role-based navigation visibility issues
+  - Updated `Sidebar` component to properly normalize user roles for navigation filtering
+  - Fixed links not appearing after login by correcting role matching logic
+
+### Fixed
+- **Authentication Token Handling**: Fixed JWT token validation and user profile retrieval
+  - Profile endpoint now correctly returns user data from SQLite when Supabase is unavailable
+  - Token generation includes proper role information
+  - User authentication state properly maintained across page refreshes
+
+### Removed
+- **Mock User Data**: Removed all hardcoded mock users (`admin@library.com`, `user@library.com`)
+- **Documentation Cleanup**: Removed redundant documentation files, keeping only:
+  - `ARCHITECTURE.md` - High-level architecture details
+  - `CHANGELOG.md` - Changes history
+  - `README.md` - Project details and usage guide
 
 ## [v1.0.7] - 2025-10-28
 

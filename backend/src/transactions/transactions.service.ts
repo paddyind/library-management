@@ -6,58 +6,92 @@ export class TransactionsService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
   async findAll(): Promise<any[]> {
-    const { data: loans, error: loansError } = await this.supabaseService
-      .getClient()
-      .from('loans')
-      .select('*, member:members(*), book:books(*)');
-
-    if (loansError) {
-      throw new Error(loansError.message);
+    // If Supabase health check failed at startup, return empty array (decision already made)
+    if (!this.supabaseService.isReady()) {
+      return [];
     }
 
-    const { data: reservations, error: reservationsError } = await this.supabaseService
-      .getClient()
-      .from('reservations')
-      .select('*, member:members(*), book:books(*)');
+    try {
+      const { data: loans, error: loansError } = await this.supabaseService
+        .getClient()
+        .from('loans')
+        .select('*, member:members(*), book:books(*)');
 
-    if (reservationsError) {
-      throw new Error(reservationsError.message);
+      if (loansError) {
+        console.warn('⚠️ Supabase loans query error:', loansError.message);
+        return [];
+      }
+
+      const { data: reservations, error: reservationsError } = await this.supabaseService
+        .getClient()
+        .from('reservations')
+        .select('*, member:members(*), book:books(*)');
+
+      if (reservationsError) {
+        console.warn('⚠️ Supabase reservations query error:', reservationsError.message);
+        return loans?.map(loan => ({ ...loan, type: 'loan' })) || [];
+      }
+
+      const transactions = [
+        ...(loans?.map(loan => ({ ...loan, type: 'loan' })) || []),
+        ...(reservations?.map(reservation => ({ ...reservation, type: 'reservation' })) || []),
+      ];
+
+      return transactions;
+    } catch (error: any) {
+      // Handle timeout and other errors gracefully
+      if (error.name === 'TimeoutError' || error.message?.includes('timeout') || error.message?.includes('aborted')) {
+        console.warn('⚠️ Supabase query timeout, returning empty transactions list');
+      } else {
+        console.warn('⚠️ Supabase connection error, returning empty transactions list:', error.message);
+      }
+      return [];
     }
-
-    const transactions = [
-      ...loans.map(loan => ({ ...loan, type: 'loan' })),
-      ...reservations.map(reservation => ({ ...reservation, type: 'reservation' })),
-    ];
-
-    return transactions;
   }
 
   async findMemberTransactions(memberId: string): Promise<any[]> {
-    const { data: loans, error: loansError } = await this.supabaseService
-      .getClient()
-      .from('loans')
-      .select('*, member:members(*), book:books(*)')
-      .eq('borrower_id', memberId);
-
-    if (loansError) {
-      throw new Error(loansError.message);
+    // If Supabase health check failed at startup, return empty array (decision already made)
+    if (!this.supabaseService.isReady()) {
+      return [];
     }
 
-    const { data: reservations, error: reservationsError } = await this.supabaseService
-      .getClient()
-      .from('reservations')
-      .select('*, member:members(*), book:books(*)')
-      .eq('member_id', memberId);
+    try {
+      const { data: loans, error: loansError } = await this.supabaseService
+        .getClient()
+        .from('loans')
+        .select('*, member:members(*), book:books(*)')
+        .eq('borrower_id', memberId);
 
-    if (reservationsError) {
-      throw new Error(reservationsError.message);
+      if (loansError) {
+        console.warn('⚠️ Supabase loans query error:', loansError.message);
+        return [];
+      }
+
+      const { data: reservations, error: reservationsError } = await this.supabaseService
+        .getClient()
+        .from('reservations')
+        .select('*, member:members(*), book:books(*)')
+        .eq('member_id', memberId);
+
+      if (reservationsError) {
+        console.warn('⚠️ Supabase reservations query error:', reservationsError.message);
+        return loans?.map(loan => ({ ...loan, type: 'loan' })) || [];
+      }
+
+      const transactions = [
+        ...(loans?.map(loan => ({ ...loan, type: 'loan' })) || []),
+        ...(reservations?.map(reservation => ({ ...reservation, type: 'reservation' })) || []),
+      ];
+
+      return transactions;
+    } catch (error: any) {
+      // Handle timeout and other errors gracefully
+      if (error.name === 'TimeoutError' || error.message?.includes('timeout') || error.message?.includes('aborted')) {
+        console.warn('⚠️ Supabase query timeout, returning empty transactions list');
+      } else {
+        console.warn('⚠️ Supabase connection error, returning empty transactions list:', error.message);
+      }
+      return [];
     }
-
-    const transactions = [
-      ...loans.map(loan => ({ ...loan, type: 'loan' })),
-      ...reservations.map(reservation => ({ ...reservation, type: 'reservation' })),
-    ];
-
-    return transactions;
   }
 }

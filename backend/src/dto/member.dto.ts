@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsString, IsOptional, MinLength, IsEnum } from 'class-validator';
 import { SubscriptionTier } from '../subscriptions/subscription.interface';
+import { MemberRole } from '../members/member.interface';
 
 export class CreateMemberDto {
   @ApiProperty({ example: 'John Doe' })
@@ -16,9 +17,15 @@ export class CreateMemberDto {
   @MinLength(6)
   password: string;
 
-  @ApiProperty({ enum: SubscriptionTier, example: SubscriptionTier.FREE })
+  @ApiProperty({ enum: SubscriptionTier, example: SubscriptionTier.FREE, required: false })
   @IsEnum(SubscriptionTier)
-  subscription: SubscriptionTier;
+  @IsOptional()
+  subscription?: SubscriptionTier;
+
+  @ApiProperty({ enum: MemberRole, example: MemberRole.MEMBER, required: false })
+  @IsEnum(MemberRole)
+  @IsOptional()
+  role?: MemberRole;
 }
 
 export class UpdateMemberDto {
@@ -37,6 +44,11 @@ export class UpdateMemberDto {
   @MinLength(6)
   @IsOptional()
   password?: string;
+
+  @ApiProperty({ enum: MemberRole, example: MemberRole.MEMBER, required: false })
+  @IsEnum(MemberRole)
+  @IsOptional()
+  role?: MemberRole;
 }
 
 export class UpdateProfileDto {

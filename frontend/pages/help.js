@@ -205,33 +205,130 @@ export default function Help() {
                 </svg>
               </div>
             </div>
-            <h3 className="text-3xl md:text-4xl font-extrabold text-center mb-8">Try Demo Accounts</h3>
-            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <h3 className="text-3xl md:text-4xl font-extrabold text-center mb-8">Getting Started</h3>
+            <div className="max-w-2xl mx-auto">
               <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 hover:bg-white/20 transition-all duration-300">
                 <div className="flex items-center mb-4">
-                  <div className="bg-yellow-400 rounded-full p-2 mr-3">
+                  <div className="bg-green-400 rounded-full p-2 mr-3">
                     <svg className="h-6 w-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                   </div>
-                  <p className="text-xl font-bold">Admin Account</p>
+                  <p className="text-xl font-bold">Create Your Account</p>
                 </div>
-                <p className="text-lg mb-1"><span className="font-semibold">Email:</span> admin@library.com</p>
-                <p className="text-lg"><span className="font-semibold">Password:</span> password</p>
-              </div>
-              <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 hover:bg-white/20 transition-all duration-300">
-                <div className="flex items-center mb-4">
-                  <div className="bg-blue-400 rounded-full p-2 mr-3">
-                    <svg className="h-6 w-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  </div>
-                  <p className="text-xl font-bold">Member Account</p>
-                </div>
-                <p className="text-lg mb-1"><span className="font-semibold">Email:</span> user@library.com</p>
-                <p className="text-lg"><span className="font-semibold">Password:</span> password</p>
+                <p className="text-lg mb-4">
+                  To get started with the Library Management System, simply register a new account by clicking the "Register" button on the home page.
+                </p>
+                <p className="text-lg">
+                  After registration, you can log in and start browsing and borrowing books from our catalog.
+                </p>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Demo Users Section - Only shown when SQLite is used */}
+        <div className="mt-12 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-xl p-8 border-2 border-indigo-200">
+          <div className="text-center mb-6">
+            <div className="inline-block bg-indigo-600 text-white p-4 rounded-xl mb-4">
+              <svg className="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Demo Accounts (SQLite Mode)</h3>
+            <p className="text-gray-600 mb-6">
+              Use these pre-seeded accounts to explore different user roles
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Admin Account */}
+            <div className="bg-white rounded-xl shadow-md p-6 border-2 border-purple-200">
+              <div className="flex items-center mb-4">
+                <div className="bg-purple-100 p-3 rounded-lg mr-3">
+                  <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <h4 className="text-lg font-bold text-gray-900">Admin</h4>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Email:</span>
+                  <code className="bg-gray-100 px-2 py-1 rounded text-purple-700 font-mono">admin@library.com</code>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Password:</span>
+                  <code className="bg-gray-100 px-2 py-1 rounded text-gray-700 font-mono">password</code>
+                </div>
+                <div className="pt-2 border-t border-gray-200">
+                  <p className="text-xs text-gray-500">
+                    Full system access including user and group management
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Librarian Account */}
+            <div className="bg-white rounded-xl shadow-md p-6 border-2 border-blue-200">
+              <div className="flex items-center mb-4">
+                <div className="bg-blue-100 p-3 rounded-lg mr-3">
+                  <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                </div>
+                <h4 className="text-lg font-bold text-gray-900">Librarian</h4>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Email:</span>
+                  <code className="bg-gray-100 px-2 py-1 rounded text-blue-700 font-mono">librarian@library.com</code>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Password:</span>
+                  <code className="bg-gray-100 px-2 py-1 rounded text-gray-700 font-mono">password</code>
+                </div>
+                <div className="pt-2 border-t border-gray-200">
+                  <p className="text-xs text-gray-500">
+                    View-only access to users and groups, can manage books
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Member Account */}
+            <div className="bg-white rounded-xl shadow-md p-6 border-2 border-green-200">
+              <div className="flex items-center mb-4">
+                <div className="bg-green-100 p-3 rounded-lg mr-3">
+                  <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <h4 className="text-lg font-bold text-gray-900">Member</h4>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Email:</span>
+                  <code className="bg-gray-100 px-2 py-1 rounded text-green-700 font-mono">member@library.com</code>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Password:</span>
+                  <code className="bg-gray-100 px-2 py-1 rounded text-gray-700 font-mono">password</code>
+                </div>
+                <div className="pt-2 border-t border-gray-200">
+                  <p className="text-xs text-gray-500">
+                    Standard user with book borrowing capabilities
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-yellow-800">
+              <strong>Note:</strong> These demo accounts are only available when using SQLite database mode. 
+              If you're using Supabase, you'll need to create your own accounts through the registration process.
+            </p>
           </div>
         </div>
 

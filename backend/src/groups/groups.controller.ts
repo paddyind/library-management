@@ -12,14 +12,16 @@ import { MemberRole } from '../members/member.interface';
 export class GroupsController {
   constructor(private readonly groupsService: GroupsService) {}
 
-  // Get all groups
+  // Get all groups (Admin/Librarian can view)
   @Get()
+  @Roles(MemberRole.ADMIN, MemberRole.LIBRARIAN)
   findAll() {
     return this.groupsService.findAll();
   }
 
-  // Get a specific group
+  // Get a specific group (Admin/Librarian can view)
   @Get(':id')
+  @Roles(MemberRole.ADMIN, MemberRole.LIBRARIAN)
   findOne(@Param('id', ParseIntPipe) id: number): Promise<Group> {
     return this.groupsService.findOne(id);
   }
@@ -49,8 +51,9 @@ export class GroupsController {
     return { message: 'Group deleted successfully' };
   }
 
-  // Get all members of a group
+  // Get all members of a group (Admin/Librarian can view)
   @Get(':id/members')
+  @Roles(MemberRole.ADMIN, MemberRole.LIBRARIAN)
   getMembers(@Param('id', ParseIntPipe) id: number) {
     return this.groupsService.getMembers(id);
   }
