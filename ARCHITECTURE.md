@@ -44,6 +44,8 @@ The Library Management System is built as a modern web application with a clear 
   - `Transactions`: Manages user transactions, including loans and reservations
   - `Search`: Handles global search functionality
   - `Subscriptions`: Manages user subscriptions and free trials
+  - `Reviews`: Manages book reviews
+  - `Ratings`: Manages book ratings
 - **Controllers**: HTTP request handlers with proper validation
 - **Services**: Business logic implementation with error handling
 - **Models**: TypeORM entities with relationships
@@ -54,13 +56,15 @@ The Library Management System is built as a modern web application with a clear 
 
 ### 3. Database (SQLite)
 - **Models**:
-  - `User`: User information, authentication, and relationships
+  - `User`: User information, authentication, and relationships (includes phone, DOB, address, etc.)
   - `Group`: User groups for RBAC with permissions array
-  - `Book`: Book catalog with status and availability
+  - `Book`: Book catalog with status and availability (includes count, status, forSale, price)
   - `Loan`: Active book loans with due dates
   - `Reservation`: Book reservations queue
   - `Subscription`: User subscription tiers and trials
   - `Notification`: User notifications with types and read status
+  - `Review`: Book reviews
+  - `Rating`: Book ratings
 
 ### 4. Authentication
 - JWT-based authentication

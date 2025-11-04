@@ -4,6 +4,7 @@ import { BooksService } from './books.service';
 import { CreateBookDto, UpdateBookDto } from '../dto/book.dto';
 import { Book } from '../books/book.interface';
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
+import { AdminGuard } from '../auth/admin.guard';
 import type { Request } from 'express';
 
 @ApiTags('Books')
@@ -14,12 +15,13 @@ export class BooksController {
   @Get()
   @ApiOperation({ summary: 'Get all books', description: 'Retrieve all books with optional search filter (public access)' })
   @ApiQuery({ name: 'search', required: false, description: 'Search books by title, author, or ISBN' })
+  @ApiQuery({ name: 'forSale', required: false, description: 'Filter books that are for sale' })
   @ApiResponse({ status: 200, description: 'List of books retrieved successfully' })
-  findAll(@Query('search') search?: string): Promise<Book[]> {
+  findAll(@Query('search') search?: string, @Query('forSale') forSale?: boolean): Promise<Book[]> {
     // Cache-Control header to prevent unnecessary caching on client side
     // But allow short cache on CDN/proxy (60 seconds)
     // Note: In production, consider implementing Redis cache for better performance
-    return this.booksService.findAll(search);
+    return this.booksService.findAll(search, forSale);
   }
 
   @Get('search')
@@ -39,7 +41,7 @@ export class BooksController {
   }
 
   @Post()
-  @UseGuards(SupabaseAuthGuard)
+  @UseGuards(SupabaseAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create new book', description: 'Add a new book to the catalog (requires authentication)' })
   @ApiBody({ type: CreateBookDto })
@@ -52,7 +54,7 @@ export class BooksController {
   }
 
   @Patch(':id')
-  @UseGuards(SupabaseAuthGuard)
+  @UseGuards(SupabaseAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update book', description: 'Update book details (requires authentication)' })
   @ApiBody({ type: UpdateBookDto })
@@ -64,7 +66,7 @@ export class BooksController {
   }
 
   @Delete(':id')
-  @UseGuards(SupabaseAuthGuard)
+  @UseGuards(SupabaseAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete book', description: 'Remove a book from the catalog (requires authentication)' })
   @ApiResponse({ status: 200, description: 'Book deleted successfully' })

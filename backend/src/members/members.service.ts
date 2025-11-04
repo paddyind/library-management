@@ -37,7 +37,7 @@ export class MembersService {
   }
 
   async create(createMemberDto: CreateMemberDto, role: MemberRole = MemberRole.MEMBER): Promise<Member> {
-    const { email, password, name } = createMemberDto;
+    const { email, password, name, phone, dateOfBirth, address, preferences, paymentMethod, paymentDetails } = createMemberDto;
 
     console.log(`🔍 [MembersService] create: Checking if user exists with email: ${email}`);
     const { data: existingMember, error: existingMemberError } = await this.supabaseService
@@ -76,7 +76,7 @@ export class MembersService {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('users')
-      .insert([{ id: authData.user.id, name, email, role }])
+      .insert([{ id: authData.user.id, name, email, role, phone, dateOfBirth, address, preferences, paymentMethod, paymentDetails }])
       .select()
       .single();
 
