@@ -32,6 +32,8 @@ import { SearchModule } from './search/search.module';
     SubscriptionsModule,
     TransactionsModule,
     SearchModule,
+    ReviewsModule,
+    RatingsModule,
   ],
 })
 export class AppModule {}

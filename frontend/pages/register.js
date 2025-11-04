@@ -118,10 +118,10 @@ export default function Register() {
               onChange={handleChange}
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
             >
-              <option value="FREE">Free (3 books)</option>
-              <option value="BRONZE">Bronze (₹299/month, 5 books)</option>
-              <option value="SILVER">Silver (₹599/month, 10 books)</option>
-              <option value="GOLD">Gold (₹999/month, 20 books)</option>
+              <option value="FREE">Free (1 week, 1 book at a time, Max 2 books)</option>
+              <option value="BRONZE">Bronze (₹299/month, 1 book at a time, Max 5 books)</option>
+              <option value="SILVER">Silver (₹599/month, 2 books at a time, Max 10 books)</option>
+              <option value="GOLD">Gold (₹999/month, 2 books at a time, Max 20 books)</option>
             </select>
           </div>
 

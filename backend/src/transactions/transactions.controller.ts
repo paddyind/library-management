@@ -1,6 +1,7 @@
-import { Controller, Get, UseGuards, Req } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CreateTransactionDto } from '../dto/transaction.dto';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { MemberRole, Member } from '../members/member.interface';
@@ -32,5 +33,15 @@ export class TransactionsController {
   findMyTransactions(@Req() req: Request) {
     const member = req.user as Member;
     return this.transactionsService.findMemberTransactions(member.id);
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new transaction', description: 'Create a new transaction (e.g., buy a book)' })
+  @ApiBody({ type: CreateTransactionDto })
+  @ApiResponse({ status: 201, description: 'Transaction created successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  create(@Body() createTransactionDto: CreateTransactionDto, @Req() req: Request) {
+    const member = req.user as Member;
+    return this.transactionsService.create(createTransactionDto, member.id);
   }
 }

@@ -1,9 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../config/supabase.service';
+import { CreateTransactionDto } from '../dto/transaction.dto';
+import { Transaction, TransactionType } from './transaction.interface';
 
 @Injectable()
 export class TransactionsService {
   constructor(private readonly supabaseService: SupabaseService) {}
+
+  async create(createTransactionDto: CreateTransactionDto, memberId: string): Promise<Transaction> {
+    const { bookId, type } = createTransactionDto;
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('transactions')
+      .insert([{ bookId, memberId, type }])
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
+  }
 
   async findAll(): Promise<any[]> {
     // If Supabase health check failed at startup, return empty array (decision already made)

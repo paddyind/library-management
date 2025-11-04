@@ -87,7 +87,7 @@ export class BooksService {
     });
   }
 
-  async findAll(query?: string): Promise<Book[]> {
+  async findAll(query?: string, forSale?: boolean): Promise<Book[]> {
     const storage = this.getPreferredStorage();
 
     if (storage === 'supabase') {
@@ -97,6 +97,10 @@ export class BooksService {
 
         if (query) {
           queryBuilder = queryBuilder.or(`title.ilike.%${query}%,author.ilike.%${query}%,isbn.ilike.%${query}%`);
+        }
+
+        if (forSale) {
+          queryBuilder = queryBuilder.eq('forSale', true);
         }
 
         const { data, error } = await queryBuilder;

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { LoansController } from './loans.controller';
 import { LoansService } from './loans.service';
 import { BooksService } from '../books/books.service';
+import { SupabaseService } from '../config/supabase.service';
 import { CreateLoanDto } from '../dto/loan.dto';
 import { Book } from '../books/book.interface';
 import { Member } from '../members/member.interface';
@@ -19,12 +20,21 @@ describe('LoansController', () => {
     findOne: jest.fn(),
   };
 
+  const mockSupabaseService = {
+    getClient: jest.fn(() => ({
+      auth: {
+        getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'user-id-placeholder' } } }),
+      },
+    })),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [LoansController],
       providers: [
         { provide: LoansService, useValue: mockLoansService },
         { provide: BooksService, useValue: mockBooksService },
+        { provide: SupabaseService, useValue: mockSupabaseService },
       ],
     }).compile();
 
@@ -51,7 +61,8 @@ describe('LoansController', () => {
       mockBooksService.findOne.mockResolvedValue(book);
       mockLoansService.create.mockResolvedValue({ ...createLoanDto, book, borrower: member });
 
-      const result = await controller.create(createLoanDto);
+      const req = { user: { id: 'user-id-placeholder' } };
+      const result = await controller.create(createLoanDto, req);
 
       expect(booksService.findOne).toHaveBeenCalledWith(createLoanDto.bookId);
       expect(loansService.create).toHaveBeenCalledWith(createLoanDto, { id: 'user-id-placeholder' }, book);

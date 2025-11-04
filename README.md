@@ -2,11 +2,11 @@
 
 A modern, full-stack library management system with **anonymous book browsing** and comprehensive administrative features. Built with Next.js, NestJS, and Docker.
 
-[![Version](https://img.shields.io/badge/version-1.0.6-blue.svg)](https://github.com/paddyind/library-management)
+[![Version](https://img.shields.io/badge/version-1.0.9-blue.svg)](https://github.com/paddyind/library-management)
 [![Frontend](https://img.shields.io/badge/frontend-100%25_complete-success.svg)](https://github.com/paddyind/library-management)
 [![Backend](https://img.shields.io/badge/backend-100%25_complete-success.svg)](https://github.com/paddyind/library-management)
 
-> **Latest Release (v1.0.6)**: Security & authentication enhancements - Fixed backend compilation errors, added route protection to all member pages, improved navigation for unauthenticated users. See [CHANGELOG.md](CHANGELOG.md) for details.
+> **Latest Release (v1.0.9)**: Added enhanced registration, admin book management, books for sale, and a book details page with reviews and ratings. See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ---
 
@@ -26,11 +26,12 @@ A modern, full-stack library management system with **anonymous book browsing** 
 - 🔔 **Notifications** - Stay updated with due dates and library news
 - ⚙️ **Profile Management** - Update your information and preferences
 - 📊 **Transaction History** - View your complete borrowing history
+- ⭐ **Reviews and Ratings** - Submit reviews and ratings for books
 
 ### For Administrators
 - 👥 **User Management** - Complete CRUD operations for user accounts
 - 🏷️ **Group Management** - Create groups and assign permissions
-- 📚 **Book Catalog** - Manage the entire book inventory
+- 📚 **Book Catalog** - Manage the entire book inventory (including books for sale)
 - 📈 **Analytics** - View library-wide statistics and reports
 - 🔐 **Role-Based Access** - Fine-grained permission control
 

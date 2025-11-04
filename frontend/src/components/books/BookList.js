@@ -9,6 +9,7 @@ function BookList({ onAddClick }) {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [forSale, setForSale] = useState(false);
   const { user, token } = useAuth();
   const router = useRouter();
 
@@ -17,7 +18,9 @@ function BookList({ onAddClick }) {
       try {
         setLoading(true);
         setError(null);
-        const response = await axios.get(`${API_BASE_URL}/books`);
+        const response = await axios.get(`${API_BASE_URL}/books`, {
+          params: { forSale },
+        });
         setBooks(response.data);
       } catch (err) {
         console.error('Error fetching books:', err);
@@ -27,7 +30,7 @@ function BookList({ onAddClick }) {
       }
     };
     fetchBooks();
-  }, []);
+  }, [forSale]);
 
   const handleReserve = async (bookId) => {
     if (!user) {
@@ -43,6 +46,25 @@ function BookList({ onAddClick }) {
     } catch (err) {
       console.error('Error reserving book:', err);
       alert(err.response?.data?.message || 'Failed to reserve book');
+    }
+  };
+
+  const handleBuy = async (bookId) => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      await axios.post(
+        `${API_BASE_URL}/transactions`,
+        { bookId, type: 'buy' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert('Book purchased successfully');
+    } catch (err) {
+      console.error('Error purchasing book:', err);
+      alert(err.response?.data?.message || 'Failed to purchase book');
     }
   };
 
@@ -67,9 +89,18 @@ function BookList({ onAddClick }) {
     <div className="flex flex-col">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">Books Catalog</h1>
-        <button onClick={onAddClick} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-          Add New Book
-        </button>
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            checked={forSale}
+            onChange={(e) => setForSale(e.target.checked)}
+            className="mr-2"
+          />
+          <label>For Sale</label>
+          <button onClick={onAddClick} className="ml-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+            Add New Book
+          </button>
+        </div>
       </div>
 
       <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
@@ -90,6 +121,12 @@ function BookList({ onAddClick }) {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    For Sale
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Price
+                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
@@ -99,7 +136,9 @@ function BookList({ onAddClick }) {
                 {books.map((book) => (
                   <tr key={book.id}>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{book.title}</div>
+                      <Link href={`/books/${book.id}`}>
+                        <a className="text-sm font-medium text-gray-900 hover:text-indigo-600">{book.title}</a>
+                      </Link>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{book.author}</div>
@@ -116,14 +155,28 @@ function BookList({ onAddClick }) {
                         {book.status}
                       </span>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{book.forSale ? 'Yes' : 'No'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{book.price}</div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
                         onClick={() => handleReserve(book.id)}
                         disabled={book.status !== 'available'}
                         className="text-indigo-600 hover:text-indigo-900 mr-4 disabled:opacity-50"
                       >
-                        Reserve
+                        Borrow
                       </button>
+                      {book.forSale && (
+                        <button
+                          onClick={() => handleBuy(book.id)}
+                          className="text-green-600 hover:text-green-900 disabled:opacity-50"
+                        >
+                          Buy
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

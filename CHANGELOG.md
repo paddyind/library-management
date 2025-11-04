@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.9] - 2025-11-03
+
+### Added
+- **Enhanced Registration Page**: Added new fields to the registration page, including phone, date of birth, address, and preferences.
+- **Admin Book Management**: Implemented a new admin-only page for managing the book inventory, including adding new books and updating existing ones.
+- **Books for Sale**: Introduced a new "for sale" feature, allowing admins to mark books as available for purchase.
+- **Book Details Page**: Created a new page to display the details of a single book, including reviews and ratings.
+- **Reviews and Ratings**: Implemented a new system for users to submit reviews and ratings for books.
+
+### Changed
+- **Membership Plans**: Updated the membership plans with new pricing and lending limits.
+- **Database Schema**: Added new tables for reviews and ratings, and new columns to the users and books tables.
+
+### Fixed
+- **Missing Migration Script**: Recreated the missing `apply-supabase-migrations.js` script to enable database migrations.
+- **Admin-Only Routes**: Added an `AdminGuard` to protect the book management endpoints from unauthorized access.
+
 ## [v1.0.8] - 2025-11-XX
 
 ### Added
