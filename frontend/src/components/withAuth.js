@@ -17,9 +17,15 @@ export function withAuth(Component, options = {}) {
       // Wait for auth to finish loading
       if (loading) return;
 
-      // Redirect to login if not authenticated
+      // Redirect to home if not authenticated (for search page, redirect to home instead of login)
       if (!user) {
         const currentPath = router.asPath;
+        // For search page, redirect to home page instead of login
+        if (currentPath.startsWith('/search')) {
+          router.push('/');
+          return;
+        }
+        // For other protected pages, redirect to login with redirect parameter
         router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
         return;
       }

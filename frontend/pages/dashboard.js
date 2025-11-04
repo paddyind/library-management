@@ -5,6 +5,8 @@ import { useRouter } from 'next/router';
 import axios from 'axios';
 import withAuth from '../src/components/withAuth';
 
+import { isAdminOrLibrarian, getUserDisplayName } from '../src/utils/roleUtils';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 function Dashboard() {
@@ -17,6 +19,9 @@ function Dashboard() {
     activeLoans: 0,
   });
   const [loading, setLoading] = useState(true);
+  
+  // Compute role-based flags at component level (available in JSX)
+  const isAdminOrLib = isAdminOrLibrarian(user);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -102,7 +107,7 @@ function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-6">
             <h1 className="text-2xl font-semibold text-gray-900">
-              Welcome back, {user.name || user.email}!
+              Welcome back, {getUserDisplayName(user)}!
             </h1>
             <p className="text-sm text-gray-600 mt-1">
               Here's what's happening in your library today.
@@ -110,7 +115,8 @@ function Dashboard() {
           </div>
           
           {/* Stats Grid */}
-          <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {/* For members, show 3 columns; for admin/librarian, show 4 columns */}
+          <div className={`mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 ${isAdminOrLib ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
             <div className="bg-white overflow-hidden shadow rounded-lg">
               <div className="p-5">
                 <div className="flex items-center">
@@ -151,25 +157,28 @@ function Dashboard() {
               </div>
             </div>
 
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Members</dt>
-                      <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">{stats.totalMembers}</div>
-                      </dd>
-                    </dl>
+            {/* Members count - only show for admin/librarian */}
+            {isAdminOrLib && (
+              <div className="bg-white overflow-hidden shadow rounded-lg">
+                <div className="p-5">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                    </div>
+                    <div className="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt className="text-sm font-medium text-gray-500 truncate">Members</dt>
+                        <dd className="flex items-baseline">
+                          <div className="text-2xl font-semibold text-gray-900">{stats.totalMembers}</div>
+                        </dd>
+                      </dl>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className="bg-white overflow-hidden shadow rounded-lg">
               <div className="p-5">
@@ -228,7 +237,7 @@ function Dashboard() {
                 </div>
               </a>
 
-              {(user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'librarian') && (
+              {isAdminOrLib && (
                 <a
                   href="/users"
                   className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500"

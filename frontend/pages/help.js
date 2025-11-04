@@ -255,7 +255,7 @@ export default function Help() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Email:</span>
-                  <code className="bg-gray-100 px-2 py-1 rounded text-purple-700 font-mono">admin@library.com</code>
+                  <code className="bg-gray-100 px-2 py-1 rounded text-purple-700 font-mono">demo_admin@library.com</code>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Password:</span>
@@ -282,7 +282,7 @@ export default function Help() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Email:</span>
-                  <code className="bg-gray-100 px-2 py-1 rounded text-blue-700 font-mono">librarian@library.com</code>
+                  <code className="bg-gray-100 px-2 py-1 rounded text-blue-700 font-mono">demo_librarian@library.com</code>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Password:</span>
@@ -309,7 +309,7 @@ export default function Help() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Email:</span>
-                  <code className="bg-gray-100 px-2 py-1 rounded text-green-700 font-mono">member@library.com</code>
+                  <code className="bg-gray-100 px-2 py-1 rounded text-green-700 font-mono">demo_member@library.com</code>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Password:</span>

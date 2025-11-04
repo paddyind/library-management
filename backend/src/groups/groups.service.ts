@@ -44,23 +44,85 @@ export class GroupsService {
 
     if (storage === 'supabase') {
       try {
-        const { data, error } = await this.supabaseService
+        // Get all groups first
+        const { data: groupsData, error: groupsError } = await this.supabaseService
           .getClient()
           .from('groups')
-          .select('*, members:group_members(count)');
+          .select('*')
+          .order('id');
+        
+        console.log(`📊 Found ${groupsData?.length || 0} groups in Supabase`);
+        if (groupsData && groupsData.length > 0) {
+          console.log(`   Group IDs and types: ${groupsData.map((g: any) => `${g.name} (ID: ${g.id}, type: ${typeof g.id})`).join(', ')}`);
+        }
 
-        if (error) {
+        if (groupsError) {
           // Only log if it's not a timeout (expected when Supabase is unavailable)
-          if (!error.message?.includes('TIMEOUT')) {
-            console.warn('⚠️ Supabase groups query error, falling back to SQLite:', error.message);
+          if (!groupsError.message?.includes('TIMEOUT')) {
+            console.warn('⚠️ Supabase groups query error, falling back to SQLite:', groupsError.message);
           }
           return this.sqliteFindAll();
         }
 
-        return data.map(group => ({
-          ...group,
-          memberCount: group.members?.[0]?.count || 0,
-        }));
+        // For each group, get member count
+        const groupsWithCounts = await Promise.all(
+          (groupsData || []).map(async (group: any) => {
+            try {
+              // Log the query details for debugging
+              console.log(`🔍 Querying group_members for group_id=${group.id} (type: ${typeof group.id}, name: ${group.name})`);
+              
+              // Ensure group.id is treated as integer (Supabase groups.id is SERIAL/INTEGER)
+              // group_id in group_members is INTEGER, so we need to match types
+              const groupIdValue = typeof group.id === 'string' ? parseInt(group.id, 10) : Number(group.id);
+              
+              // Fetch actual records to count (more reliable than count query)
+              const { data: membersData, error: membersError } = await this.supabaseService
+                .getClient()
+                .from('group_members')
+                .select('group_id, member_id')
+                .eq('group_id', groupIdValue);
+              
+              // Debug: Check if there's any data in group_members at all
+              if (!membersData || membersData.length === 0) {
+                console.log(`   🔍 No members found with group_id=${groupIdValue}, checking all group_members...`);
+                const { data: allMembers, error: allError } = await this.supabaseService
+                  .getClient()
+                  .from('group_members')
+                  .select('group_id, member_id')
+                  .limit(10);
+                if (!allError && allMembers) {
+                  console.log(`   📋 Sample group_members data: ${JSON.stringify(allMembers)}`);
+                  console.log(`   🔍 Checking if any match group_id=${groupIdValue} (comparing types: ${allMembers.map((m: any) => typeof m.group_id).join(', ')})`);
+                }
+              }
+
+              if (membersError) {
+                console.warn(`⚠️ Error querying group_members for group ${group.id} (${group.name}):`, membersError.message, membersError.code);
+                return {
+                  ...group,
+                  memberCount: 0,
+                };
+              }
+
+              // Use actual data length instead of count query (more reliable)
+              const memberCount = membersData?.length || 0;
+              console.log(`✅ Group ${group.name} (ID: ${group.id}) has ${memberCount} members${memberCount > 0 ? `: ${JSON.stringify(membersData.map((m: any) => ({ group_id: m.group_id, member_id: m.member_id })))}` : ''}`);
+              
+              return {
+                ...group,
+                memberCount: memberCount,
+              };
+            } catch (error: any) {
+              console.error(`❌ Exception getting member count for group ${group.id}:`, error.message, error.stack);
+              return {
+                ...group,
+                memberCount: 0,
+              };
+            }
+          })
+        );
+
+        return groupsWithCounts;
       } catch (error: any) {
         // Only log if it's not a timeout (expected when Supabase is unavailable)
         if (!error.message?.includes('TIMEOUT') && error.code !== 'ETIMEDOUT') {
@@ -442,7 +504,7 @@ export class GroupsService {
       try {
         const { data, error } = await this.supabaseService
           .getClient()
-          .from('members')
+          .from('users')
           .select('*, group_members!inner(group_id)')
           .eq('group_members.group_id', groupId);
 

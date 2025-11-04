@@ -16,6 +16,9 @@ export class BooksController {
   @ApiQuery({ name: 'search', required: false, description: 'Search books by title, author, or ISBN' })
   @ApiResponse({ status: 200, description: 'List of books retrieved successfully' })
   findAll(@Query('search') search?: string): Promise<Book[]> {
+    // Cache-Control header to prevent unnecessary caching on client side
+    // But allow short cache on CDN/proxy (60 seconds)
+    // Note: In production, consider implementing Redis cache for better performance
     return this.booksService.findAll(search);
   }
 

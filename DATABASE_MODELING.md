@@ -78,6 +78,7 @@ CREATE TABLE public.users (
     firstName TEXT,
     lastName TEXT,
     role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'librarian', 'member')),
+    is_demo BOOLEAN DEFAULT FALSE,  -- Indicates demo/test user (excluded from backups)
     notificationPreferences JSONB DEFAULT '{}',
     createdAt TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updatedAt TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -94,6 +95,7 @@ CREATE TABLE users (
     firstName TEXT,
     lastName TEXT,
     role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'librarian', 'member')),
+    is_demo INTEGER DEFAULT 0 CHECK (is_demo IN (0, 1)),  -- Indicates demo/test user (excluded from backups)
     notificationPreferences TEXT DEFAULT '{}',
     createdAt TEXT NOT NULL DEFAULT (datetime('now')),
     updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
@@ -107,11 +109,17 @@ CREATE TABLE users (
 **Indexes**:
 - `idx_users_email` - Fast email lookups
 - `idx_users_role` - Role-based queries
+- `idx_users_is_demo` - Fast demo user filtering
 
 **Constraints**:
 - Email must be unique
 - Role must be one of: `admin`, `librarian`, `member`
 - Supabase: Foreign key to `auth.users`
+
+**Demo Users**:
+- `is_demo = true` (Supabase) or `is_demo = 1` (SQLite) marks demo/test users
+- Demo users are excluded from backups (can be recreated via seeding)
+- Demo users: `demo_admin@library.com`, `demo_librarian@library.com`, `demo_member@library.com`
 
 ---
 
@@ -566,11 +574,70 @@ node scripts/apply-supabase-migrations.js
 
 ---
 
+## 💾 Backup & Restore Strategy
+
+### Demo User Indicator
+
+All demo/test users are marked with `is_demo = true` (Supabase) or `is_demo = 1` (SQLite). This allows:
+- **Exclusion from backups**: Demo users are automatically excluded from backups
+- **Safe recreation**: Demo users can be safely deleted and recreated during seeding
+- **Data protection**: Real user data is protected during backups
+
+**Demo Users**:
+- `demo_admin@library.com`
+- `demo_librarian@library.com`
+- `demo_member@library.com`
+
+### Backup Location
+
+Backups are stored in `backend/backups/`:
+- Supabase: `backend/backups/supabase/supabase-backup-*.json`
+- SQLite: `backend/backups/sqlite/sqlite-backup-*.json`
+
+### Backup Commands
+
+```bash
+# Create backup (auto-detects storage type)
+npm run db:backup
+
+# Restore from backup
+npm run db:restore <backup-file> --confirm
+
+# Scrap and recreate (backup → migrate → restore)
+npm run db:reset
+```
+
+### What Gets Backed Up
+
+- ✅ Real users (is_demo = false/0)
+- ✅ Books
+- ✅ Groups and group_members
+- ✅ Transactions
+- ✅ Reservations
+- ✅ Notifications
+
+- ❌ Demo users (excluded automatically)
+
+### Restore Process
+
+When restoring from backup:
+1. Run migrations to ensure schema is up-to-date
+2. Restore backup data (real users only)
+3. Run seed to recreate demo users
+
+This ensures:
+- Real user data is preserved
+- Demo users are always in sync with seed script
+- Schema is always current
+
+---
+
 ## 📚 Version History
 
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2025-10-31 | Initial schema with all core tables |
+| 2.0.0 | 2025-10-31 | Added is_demo flag to users table |
 
 ---
 

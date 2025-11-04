@@ -4,6 +4,7 @@ export interface Book {
   author: string;
   isbn: string;
   owner_id: string;
+  status?: string; // Book availability status: 'available', 'borrowed', 'reserved'
   createdAt: Date;
   updatedAt: Date;
 }

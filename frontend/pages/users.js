@@ -4,6 +4,8 @@ import { withAdminOrLibrarianAuth } from '../src/components/withAuth';
 import { useAuth } from '../src/contexts/AuthContext';
 import axios from 'axios';
 
+import { isAdmin, getUserDisplayName } from '../src/utils/roleUtils';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 function UsersPage() {
@@ -20,8 +22,8 @@ function UsersPage() {
     role: 'member',
   });
 
-  const isAdmin = currentUser?.role?.toLowerCase() === 'admin';
-  const canEdit = isAdmin; // Only admins can edit
+  const userIsAdmin = isAdmin(currentUser);
+  const canEdit = userIsAdmin; // Only admins can edit
 
   useEffect(() => {
     fetchUsers();

@@ -91,11 +91,13 @@ async function bootstrap() {
     .addTag('Authentication', 'User authentication and registration endpoints')
     .addTag('Books', 'Book catalog and borrowing operations')
     .addTag('Members', 'Member management (Admin only)')
+    .addTag('Users', 'User management endpoints (alias for Members, Admin/Librarian only)')
     .addTag('Transactions', 'Borrowing and return transaction management')
     .addTag('Notifications', 'User notification system')
     .addTag('Profile', 'User profile management')
     .addTag('Reservations', 'Book reservation system')
     .addTag('Groups', 'User group and permission management')
+    .addTag('Search', 'Search functionality for books and members')
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document, {

@@ -5,6 +5,8 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
 
+import { getUserDisplayName } from '../../utils/roleUtils';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 export default function Header({ onMenuButtonClick }) {
@@ -43,15 +45,21 @@ export default function Header({ onMenuButtonClick }) {
 
         const response = await axios.get(`${API_BASE_URL}/notifications/unread-count`, {
           headers: { Authorization: `Bearer ${token}` },
-          timeout: 5000, // 5 second timeout
+          timeout: 3000, // 3 second timeout
         });
         if (isMounted) setUnreadCount(response.data || 0);
       } catch (err) {
-        // Silently fail - no notifications available
+        // Silently fail - no notifications available or endpoint doesn't exist
         if (isMounted) setUnreadCount(0);
-        // Only log errors in development to reduce console noise
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Failed to fetch unread notifications:', err);
+        // Only log timeout/network errors, ignore 404s (endpoint might not exist)
+        if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+          // Timeout - endpoint might be slow or unavailable, silently fail
+          if (process.env.NODE_ENV === 'development') {
+            console.debug('Notifications endpoint timeout or unavailable');
+          }
+        } else if (err.response?.status !== 404 && process.env.NODE_ENV === 'development') {
+          // Log other errors except 404 (endpoint doesn't exist)
+          console.error('Failed to fetch unread notifications:', err.message);
         }
       }
     };
@@ -241,7 +249,9 @@ export default function Header({ onMenuButtonClick }) {
                   src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
                   alt=""
                 />
-                <span className="hidden md:block text-gray-700 font-medium">{user?.name || user?.email || 'User'}</span>
+                <span className="hidden md:block text-gray-700 font-medium">
+                  {getUserDisplayName(user)}
+                </span>
                 <svg className="hidden md:block h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                 </svg>

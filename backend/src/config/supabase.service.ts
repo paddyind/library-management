@@ -11,7 +11,10 @@ export class SupabaseService implements OnModuleInit {
 
   constructor(private configService: ConfigService) {
     const supabaseUrl = this.configService.get<string>('NEXT_PUBLIC_SUPABASE_URL') || this.configService.get<string>('SUPABASE_URL');
-    const supabaseKey = this.configService.get<string>('NEXT_PUBLIC_SUPABASE_ANON_KEY') || this.configService.get<string>('SUPABASE_KEY');
+    // Prefer service role key for backend operations (bypasses RLS), fallback to anon key
+    const supabaseKey = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY') || 
+                        this.configService.get<string>('NEXT_PUBLIC_SUPABASE_ANON_KEY') || 
+                        this.configService.get<string>('SUPABASE_KEY');
     
     if (supabaseUrl && supabaseKey) {
       try {
@@ -45,7 +48,9 @@ export class SupabaseService implements OnModuleInit {
                 }
                 
                 // Always add apikey header from config (Supabase client might not pass it through)
-                const supabaseKey = this.configService.get<string>('NEXT_PUBLIC_SUPABASE_ANON_KEY') || 
+                // Prefer service role key (bypasses RLS), fallback to anon key
+                const supabaseKey = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY') ||
+                                   this.configService.get<string>('NEXT_PUBLIC_SUPABASE_ANON_KEY') || 
                                    this.configService.get<string>('SUPABASE_KEY');
                 if (supabaseKey && !requestHeaders.apikey && !requestHeaders.Authorization) {
                   requestHeaders.apikey = supabaseKey;

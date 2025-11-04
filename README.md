@@ -87,19 +87,77 @@ A modern, full-stack library management system with **anonymous book browsing** 
    NO_PROXY=localhost,127.0.0.1,*.local
    ```
    
-   See [SUPABASE_CONFIG.md](SUPABASE_CONFIG.md) for detailed configuration and troubleshooting.
+   See [DATABASE_SETUP_INSTRUCTIONS.md](DATABASE_SETUP_INSTRUCTIONS.md) for detailed database setup and sync instructions.
 
-3. **Start the application**
+3. **Initialize databases** (Choose one method)
+   
+   **Method 1: Single Script (Recommended)**
+   
+   **Unix/Linux/Mac:**
+   ```bash
+   cd library-management
+   ./data/scripts/setup-database.sh
+   ```
+   
+   **Windows:**
+   ```cmd
+   cd library-management
+   data\scripts\setup-database.bat
+   ```
+   
+   **Or via Docker:**
+   ```bash
+   docker compose exec backend npm run db:init
+   ```
+   
+   This single script:
+   - ✅ Checks Docker is running
+   - ✅ Runs migrations (creates tables if missing)
+   - ✅ Restores from backup if available, OR seeds with demo data
+   - ✅ Optionally sets up Supabase if configured
+   - ✅ Offers dual-seed for both databases
+   
+   **For clean start (fresh setup):**
+   ```bash
+   # Unix/Linux/Mac
+   ./data/scripts/setup-database.sh --clean-all --force
+   
+   # Windows
+   data\scripts\setup-database.bat --clean-all --force
+   ```
+   
+   **Method 2: Manual Docker Commands**
+   
+   ```bash
+   # For SQLite: Smart init (migrate + restore/seed)
+   docker compose exec backend npm run db:init
+   
+   # For Supabase: Automated migration (recommended)
+   # Add SUPABASE_DB_PASSWORD to .env first (get from Supabase Dashboard)
+   docker compose exec backend npm run supabase:migrate
+   
+   # OR manual approach:
+   docker compose exec backend npm run supabase:sql
+   # Copy SQL from data/backups/supabase-migration-combined.sql
+   # Paste in Supabase Dashboard → SQL Editor → Run
+   
+   # Then seed both databases
+   docker compose exec backend npm run db:sync
+   ```
+   
+   See [DATABASE_SETUP_INSTRUCTIONS.md](DATABASE_SETUP_INSTRUCTIONS.md) for complete setup guide with all options.
+
+4. **Start the application**
    ```bash
    docker compose up -d
    ```
 
-4. **Access the application**
+5. **Access the application**
    - **Frontend**: http://localhost:3100
    - **Backend API**: http://localhost:4000/api
    - **Swagger API Docs**: http://localhost:4000/api-docs
 
-4. **Create your first account**
+6. **Create your first account**
    - Click "Register" on the welcome page
    - Fill in your details
    - Start browsing and borrowing books!
@@ -148,9 +206,7 @@ These routes require admin role and redirect non-admins to home page:
 ## 📚 Documentation
 
 - **[Architecture](ARCHITECTURE.md)** - System architecture and design decisions
-- **[Database Modeling](DATABASE_MODELING.md)** - Complete database schema documentation
-- **[Database Management](backend/README_DATABASE.md)** - Database migrations, backups, and restore guide
-- **[Supabase Configuration](SUPABASE_CONFIG.md)** - Options for configuring Supabase database
+- **[Database Modeling](DATABASE_MODELING.md)** - Complete database schema and modeling documentation
 - **[Changelog](CHANGELOG.md)** - Version history and updates
 - **[API Documentation](http://localhost:4000/api-docs)** - Interactive Swagger/OpenAPI documentation (when server is running)
 
@@ -425,17 +481,91 @@ AUTH_STORAGE=supabase docker compose exec backend npm run seed
 ```
 
 **Seeded Data Includes:**
-- 2 Demo Users:
-  - `admin@library.com` (Admin role) - Password: `password`
-  - `member@library.com` (Member role) - Password: `password`
-- 5 Sample Books (The Great Gatsby, To Kill a Mockingbird, 1984, Pride and Prejudice, The Catcher in the Rye)
-- 3 Groups (Administrators, Librarians, Members) - Supabase only
+- 3 Demo Users:
+  - `demo_admin@library.com` (Admin role) - Password: `password`
+  - `demo_librarian@library.com` (Librarian role) - Password: `password`
+  - `demo_member@library.com` (Member role) - Password: `password`
+- 8 Sample Books (The Great Gatsby, To Kill a Mockingbird, 1984, Pride and Prejudice, The Catcher in the Rye, The Hobbit, Harry Potter, The Da Vinci Code)
+- 3 Groups (Administrators, Librarians, Members) with user-group relationships
 
 **Note:** The seed script automatically detects which database to use based on:
 - `AUTH_STORAGE` environment variable (`auto`, `sqlite`, or `supabase`)
 - Availability of Supabase credentials (if `auto` mode)
 
 If Supabase is not configured, it will automatically seed SQLite instead.
+
+---
+
+## 💾 Database Backup Best Practices
+
+### Backup Strategy
+
+**Location**: Backups are stored in `backend/backups/` directory:
+- `backend/backups/supabase/` - Supabase backups
+- `backend/backups/sqlite/` - SQLite backups
+
+**Demo Users**: Demo users (`demo_admin@library.com`, etc.) are **excluded from backups** automatically. They can be recreated via seeding, so there's no need to backup them.
+
+**Real Users**: Only real user accounts (where `is_demo = false`) are included in backups to protect actual user data.
+
+### Creating Backups
+
+```bash
+# Backup current database (auto-detects storage type)
+docker compose exec backend npm run db:backup
+
+# Backup creates timestamped JSON file:
+# backend/backups/supabase/supabase-backup-2025-10-31T12-00-00-000Z.json
+# backend/backups/sqlite/sqlite-backup-2025-10-31T12-00-00-000Z.json
+```
+
+### Restoring from Backup
+
+```bash
+# List available backups
+ls backend/backups/supabase/
+ls backend/backups/sqlite/
+
+# Restore from specific backup (use --confirm flag)
+docker compose exec backend npm run db:restore backend/backups/sqlite/sqlite-backup-*.json --confirm
+```
+
+### Scrap and Recreate Workflow
+
+For complete database reset with data restoration:
+
+```bash
+# 1. Create backup first (always!)
+docker compose exec backend npm run db:backup
+
+# 2. Run reset (this will: backup → migrate → restore)
+docker compose exec backend npm run db:reset
+
+# OR manually:
+# docker compose exec backend npm run db:migrate  # Recreate schema
+# docker compose exec backend npm run db:restore <backup-file> --confirm  # Restore data
+```
+
+### Best Practices
+
+1. **Always backup before migrations or major changes**
+2. **Regular backups**: Schedule daily/weekly backups for production
+3. **Backup verification**: Test restore process periodically
+4. **Version control**: Keep backup files organized with timestamps
+5. **Demo vs Real**: Demo users are automatically excluded - they're recreated on seed
+
+### What Gets Backed Up
+
+- ✅ **Real users** (is_demo = false) - Protected user accounts
+- ✅ **Books** - All book catalog data
+- ✅ **Groups** - User groups and permissions
+- ✅ **Transactions** - Borrowing history
+- ✅ **Reservations** - Book reservations
+- ✅ **Notifications** - User notifications
+
+- ❌ **Demo users** (is_demo = true) - Excluded (can be recreated)
+
+**See**: [DATABASE_MODELING.md](DATABASE_MODELING.md) for complete schema documentation.
 
 ---
 

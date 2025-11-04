@@ -35,7 +35,7 @@ services:
       - "4000:4000"
     volumes:
       - ./backend/src:/app/src
-      - ./backend/scripts:/app/scripts
+      - ./backend/package.json:/app/package.json
       - ./data:/app/data
       - /app/node_modules  # Prevent host node_modules from overriding container's compiled modules
     environment:
@@ -47,6 +47,7 @@ services:
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD}
       - AUTH_STORAGE=${AUTH_STORAGE:-auto}
       # Proxy configuration for corporate networks (optional)
       - HTTP_PROXY=${HTTP_PROXY}

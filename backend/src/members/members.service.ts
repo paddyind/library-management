@@ -39,16 +39,25 @@ export class MembersService {
   async create(createMemberDto: CreateMemberDto, role: MemberRole = MemberRole.MEMBER): Promise<Member> {
     const { email, password, name } = createMemberDto;
 
+    console.log(`🔍 [MembersService] create: Checking if user exists with email: ${email}`);
     const { data: existingMember, error: existingMemberError } = await this.supabaseService
       .getClient()
-      .from('members')
+      .from('users')
       .select('email')
       .eq('email', email)
-      .single();
+      .maybeSingle(); // Use maybeSingle() - returns null if no rows found
+
+    if (existingMemberError && existingMemberError.code !== 'PGRST116') {
+      console.error(`❌ [MembersService] create - Check existing error:`, existingMemberError.message, existingMemberError.code);
+      // Don't throw - might be a schema issue, continue with creation
+    }
 
     if (existingMember) {
+      console.warn(`⚠️ [MembersService] create: User already exists with email: ${email}`);
       throw new ConflictException('A member with this email already exists');
     }
+
+    console.log(`✅ [MembersService] create: No existing user found, proceeding with creation`);
 
     const { data: authData, error: authError } = await this.supabaseService.getClient().auth.signUp({
       email,
@@ -63,16 +72,20 @@ export class MembersService {
       throw new Error('Failed to create user');
     }
 
+    console.log(`🔍 [MembersService] create: Inserting user into users table: ${email}`);
     const { data, error } = await this.supabaseService
       .getClient()
-      .from('members')
+      .from('users')
       .insert([{ id: authData.user.id, name, email, role }])
+      .select()
       .single();
 
     if (error) {
+      console.error(`❌ [MembersService] create - Insert error:`, error.message, error.code, error.details);
       throw new Error(error.message);
     }
 
+    console.log(`✅ [MembersService] create: User created successfully: ${email}`);
     return data;
   }
 
@@ -81,7 +94,8 @@ export class MembersService {
 
     if (storage === 'supabase') {
       try {
-        let queryBuilder = this.supabaseService.getClient().from('members').select('*');
+        console.log(`🔍 [MembersService] findAll: Querying users table${query ? ` with filter: ${query}` : ''}`);
+        let queryBuilder = this.supabaseService.getClient().from('users').select('*');
 
         if (query) {
           queryBuilder = queryBuilder.or(`name.ilike.%${query}%,email.ilike.%${query}%`);
@@ -90,12 +104,15 @@ export class MembersService {
         const { data, error } = await queryBuilder;
 
         if (error) {
+          console.error(`❌ [MembersService] findAll error:`, error.message, error.code, error);
           console.warn('⚠️ Supabase query error, falling back to SQLite:', error.message);
           return this.findAllFromSqlite(query);
         }
 
+        console.log(`✅ [MembersService] findAll: Found ${data?.length || 0} users`);
         return data || [];
       } catch (error: any) {
+        console.error(`❌ [MembersService] findAll exception:`, error.message);
         console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
         return this.findAllFromSqlite(query);
       }
@@ -152,21 +169,30 @@ export class MembersService {
     // Try Supabase first if preferred (credentials exist)
     if (storage === 'supabase') {
       try {
+        console.log(`🔍 [MembersService] findOne: Querying users table for id: ${id}`);
         // Attempt Supabase query even if service reports not ready
         const { data, error } = await this.supabaseService
           .getClient()
-          .from('members')
+          .from('users')
           .select('*')
           .eq('id', id)
-          .single();
+          .maybeSingle(); // Use maybeSingle() - returns null if no rows found
 
         if (error) {
+          console.error(`❌ [MembersService] findOne error:`, error.message, error.code, error);
           console.warn('⚠️ Supabase query error, falling back to SQLite:', error.message);
           return this.findOneFromSqlite(id);
         }
 
+        if (!data) {
+          console.warn(`⚠️ [MembersService] findOne: No user found with id: ${id}, falling back to SQLite`);
+          return this.findOneFromSqlite(id);
+        }
+
+        console.log(`✅ [MembersService] findOne: User found in Supabase`);
         return data;
       } catch (error: any) {
+        console.error(`❌ [MembersService] findOne exception:`, error.message);
         console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
         return this.findOneFromSqlite(id);
       }
@@ -214,33 +240,57 @@ export class MembersService {
   }
 
   async findByEmail(email: string): Promise<Member | undefined> {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('members')
-      .select('*')
-      .eq('email', email)
-      .single();
+    try {
+      console.log(`🔍 [MembersService] findByEmail: Querying users table for email: ${email}`);
+      const { data, error } = await this.supabaseService
+        .getClient()
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .maybeSingle(); // Use maybeSingle() instead of single() - returns null if no rows found instead of error
 
-    return data || undefined;
+      if (error) {
+        console.error(`❌ [MembersService] findByEmail error:`, error.message, error.code, error);
+        return undefined;
+      }
+
+      console.log(`✅ [MembersService] findByEmail: Found user:`, data ? 'yes' : 'no');
+      return data || undefined;
+    } catch (err: any) {
+      console.error(`❌ [MembersService] findByEmail exception:`, err.message);
+      return undefined;
+    }
   }
 
   async update(id: string, updateMemberDto: UpdateMemberDto): Promise<Member> {
+    console.log(`🔍 [MembersService] update: Updating user id: ${id}`);
     const { data, error } = await this.supabaseService
       .getClient()
-      .from('members')
+      .from('users')
       .update(updateMemberDto)
       .eq('id', id)
+      .select()
       .single();
 
     if (error) {
+      console.error(`❌ [MembersService] update error:`, error.message, error.code, error);
+      if (error.code === 'PGRST116') {
+        throw new NotFoundException(`Member with ID "${id}" not found`);
+      }
+      throw new NotFoundException(`Member with ID "${id}" not found: ${error.message}`);
+    }
+
+    if (!data) {
+      console.warn(`⚠️ [MembersService] update: No rows updated for id: ${id}`);
       throw new NotFoundException(`Member with ID "${id}" not found`);
     }
 
+    console.log(`✅ [MembersService] update: User updated successfully`);
     return data;
   }
 
   async remove(id: string): Promise<void> {
-    const { error } = await this.supabaseService.getClient().from('members').delete().eq('id', id);
+    const { error } = await this.supabaseService.getClient().from('users').delete().eq('id', id);
 
     if (error) {
       throw new NotFoundException(`Member with ID "${id}" not found`);

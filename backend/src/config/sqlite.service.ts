@@ -21,6 +21,7 @@ export interface Book {
   author: string;
   isbn: string;
   owner_id: string;
+  status?: string; // Optional status field
   createdAt: Date;
   updatedAt: Date;
 }
@@ -270,12 +271,12 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
     const now = new Date().toISOString();
 
     const stmt = this.db.prepare(`
-      INSERT INTO books (id, title, author, isbn, owner_id, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO books (id, title, author, isbn, ownerId, createdAt, updatedAt, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     try {
-      stmt.run(id, bookData.title, bookData.author, bookData.isbn || '', bookData.owner_id, now, now);
+      stmt.run(id, bookData.title, bookData.author, bookData.isbn || '', bookData.owner_id, now, now, (bookData as any).status || 'available');
 
       const book = this.findBookById(id);
       if (!book) {
@@ -312,7 +313,8 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
       title: row.title,
       author: row.author,
       isbn: row.isbn || '',
-      owner_id: row.owner_id,
+      owner_id: row.ownerId || row.owner_id, // Support both column names
+      status: row.status || 'available', // Map status field
       createdAt: new Date(row.createdAt),
       updatedAt: new Date(row.updatedAt),
     }));
@@ -335,7 +337,8 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
       title: row.title,
       author: row.author,
       isbn: row.isbn || '',
-      owner_id: row.owner_id,
+      owner_id: row.ownerId || row.owner_id, // Support both column names
+      status: row.status || 'available', // Map status field
       createdAt: new Date(row.createdAt),
       updatedAt: new Date(row.updatedAt),
     };

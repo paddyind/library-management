@@ -207,7 +207,7 @@ function BooksPage() {
                         {book.status}
                       </span>
                       <span className="text-xs text-gray-500">
-                        {book.availableCopies || 0} available
+                        {book.status === 'available' ? '1 available' : '0 available'}
                       </span>
                     </div>
 

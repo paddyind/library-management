@@ -4,10 +4,11 @@ import Link from 'next/link';
 import axios from 'axios';
 import Layout from '../src/components/layout/Layout.js';
 import { useAuth } from '../src/contexts/AuthContext';
+import withAuth from '../src/components/withAuth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
-export default function SearchPage() {
+function SearchPage() {
   const router = useRouter();
   const { q } = router.query;
   const { user } = useAuth();
@@ -212,3 +213,5 @@ export default function SearchPage() {
     </Layout>
   );
 }
+
+export default withAuth(SearchPage);

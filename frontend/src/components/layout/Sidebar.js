@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../contexts/AuthContext';
+import { normalizeRole } from '../../utils/roleUtils';
 
 const navigation = [
   {
@@ -83,13 +84,24 @@ export default function Sidebar({ isOpen, onClose }) {
 
   // Filter navigation based on user role
   // Normalize role to match navigation roles ('Admin', 'Librarian', or 'Member')
-  const normalizedRole = user?.role 
-    ? user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase()
+  const userRole = normalizeRole(user?.role);
+  const normalizedRole = userRole 
+    ? userRole.charAt(0).toUpperCase() + userRole.slice(1)
     : null;
   
-  const filteredNavigation = navigation.filter(item => 
-    !item.roles || !normalizedRole || item.roles.includes(normalizedRole)
-  );
+  // Show item if: (item has no roles requirement) OR (user has role AND role matches item's roles)
+  const filteredNavigation = navigation.filter(item => {
+    // If item has no role requirements, show it to everyone
+    if (!item.roles || item.roles.length === 0) {
+      return true;
+    }
+    // If user has no role, hide items that require roles
+    if (!normalizedRole) {
+      return false;
+    }
+    // Check if user's role matches any of the item's allowed roles
+    return item.roles.includes(normalizedRole);
+  });
 
   return (
     <>

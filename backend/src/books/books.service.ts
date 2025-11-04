@@ -92,6 +92,7 @@ export class BooksService {
 
     if (storage === 'supabase') {
       try {
+        console.log(`📚 [BooksService] findAll: Querying books${query ? ` with filter: ${query}` : ''}`);
         let queryBuilder = this.supabaseService.getClient().from('books').select('*');
 
         if (query) {
@@ -101,17 +102,21 @@ export class BooksService {
         const { data, error } = await queryBuilder;
 
         if (error) {
+          console.error(`❌ [BooksService] findAll error:`, error.message, error.code);
           console.warn('⚠️ Supabase query error, falling back to SQLite:', error.message);
           return this.sqliteFindAll(query);
         }
 
+        console.log(`✅ [BooksService] findAll: Found ${data?.length || 0} books`);
         return data || [];
       } catch (error: any) {
+        console.error(`❌ [BooksService] findAll exception:`, error.message);
         console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
         return this.sqliteFindAll(query);
       }
     }
 
+    console.log(`📚 [BooksService] findAll: Using SQLite${query ? ` with filter: ${query}` : ''}`);
     return this.sqliteFindAll(query);
   }
 

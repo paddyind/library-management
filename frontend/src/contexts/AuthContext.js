@@ -39,8 +39,20 @@ export const AuthProvider = ({ children }) => {
     });
     const { access_token, user: userData } = response.data;
     localStorage.setItem('token', access_token);
-    setUser(userData);
-    return response.data;
+    
+    // Immediately fetch full profile to ensure we have complete user data (name, role, etc.)
+    try {
+      const profileResponse = await axios.get(`${API_BASE_URL}/profile`, {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      setUser(profileResponse.data);
+      return { ...response.data, user: profileResponse.data };
+    } catch (error) {
+      // If profile fetch fails, use login response data as fallback
+      console.warn('Failed to fetch profile after login, using login response data:', error.message);
+      setUser(userData);
+      return response.data;
+    }
   };
 
   const logout = () => {

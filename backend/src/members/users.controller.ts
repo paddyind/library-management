@@ -12,6 +12,7 @@ import type { Request } from 'express';
 /**
  * Users Controller - Alias for Members Controller
  * Provides backward compatibility with /api/users endpoint
+ * Admin and Librarian can view users; only Admin can edit/delete
  */
 @ApiTags('Users')
 @Controller('users')

@@ -32,7 +32,7 @@ function TransactionsPage() {
           return;
         }
 
-        const url = user.role === 'Admin' 
+        const url = user?.role?.toLowerCase() === 'admin' 
           ? `${API_BASE_URL}/transactions` 
           : `${API_BASE_URL}/transactions/my-transactions`;
         

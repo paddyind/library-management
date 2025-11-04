@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import axios from 'axios';
@@ -12,10 +12,16 @@ export default function WelcomePage() {
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'top', 'recent'
   const router = useRouter();
+  
+  // Use ref to prevent duplicate fetches (React StrictMode causes double renders in dev)
+  const fetchRef = useRef(false);
+  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
-    // Fetch books only once on component mount
-    fetchBooks();
+    // Fetch books only once on component mount (even with React StrictMode double render)
+    if (!hasFetchedRef.current && !fetchRef.current) {
+      fetchBooks();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array - only fetch once
 
@@ -33,34 +39,72 @@ export default function WelcomePage() {
   }, [searchQuery, books]);
 
   const fetchBooks = async () => {
-    // Prevent multiple simultaneous fetches
-    if (loading) return;
+    // Prevent multiple simultaneous fetches (React StrictMode causes double renders)
+    if (fetchRef.current || hasFetchedRef.current) {
+      console.log('⏭️ [HomePage] Skipping duplicate fetch (already in progress or completed)');
+      return;
+    }
+    
+    fetchRef.current = true;
     
     try {
       setLoading(true);
+      const apiUrl = `${API_BASE_URL}/books`;
+      console.log('📚 [HomePage] Fetching books from:', apiUrl);
+      
       // Try to fetch books without authentication (public endpoint)
-      const response = await axios.get(`${API_BASE_URL}/books`, {
-        timeout: 10000, // 10 second timeout
+      const response = await axios.get(apiUrl, {
+        timeout: 15000, // 15 second timeout
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // Add response interceptor to handle network errors
+        validateStatus: (status) => status < 500, // Don't throw on 4xx
       });
-      setBooks(Array.isArray(response.data) ? response.data : []);
-      setFilteredBooks(Array.isArray(response.data) ? response.data : []);
+      
+      if (response.status === 200 && response.data) {
+        console.log('✅ [HomePage] Books fetched successfully:', response.data?.length || 0, 'books');
+        
+        const booksData = Array.isArray(response.data) ? response.data : [];
+        
+        // Map books to ensure they have the expected structure
+        const mappedBooks = booksData.map(book => ({
+          id: book.id,
+          title: book.title || 'Untitled',
+          author: book.author || 'Unknown Author',
+          isbn: book.isbn || '',
+          available: book.status === 'available' || book.status === undefined || book.available === true,
+        }));
+        
+        setBooks(mappedBooks);
+        setFilteredBooks(mappedBooks);
+        hasFetchedRef.current = true; // Mark as successfully fetched
+      } else {
+        console.warn('⚠️ [HomePage] Unexpected response:', response.status, response.data);
+        setBooks([]);
+        setFilteredBooks([]);
+      }
     } catch (err) {
-      console.error('Failed to fetch books:', err);
-      // Show sample books if API fails
-      const sampleBooks = [
-        { id: 1, title: 'The Great Gatsby', author: 'F. Scott Fitzgerald', isbn: '9780743273565', available: true },
-        { id: 2, title: 'To Kill a Mockingbird', author: 'Harper Lee', isbn: '9780061120084', available: true },
-        { id: 3, title: '1984', author: 'George Orwell', isbn: '9780451524935', available: false },
-        { id: 4, title: 'Pride and Prejudice', author: 'Jane Austen', isbn: '9780141439518', available: true },
-        { id: 5, title: 'The Catcher in the Rye', author: 'J.D. Salinger', isbn: '9780316769174', available: true },
-        { id: 6, title: 'The Hobbit', author: 'J.R.R. Tolkien', isbn: '9780547928227', available: true },
-        { id: 7, title: 'Harry Potter and the Sorcerer\'s Stone', author: 'J.K. Rowling', isbn: '9780590353427', available: false },
-        { id: 8, title: 'The Da Vinci Code', author: 'Dan Brown', isbn: '9780307474278', available: true },
-      ];
-      setBooks(sampleBooks);
-      setFilteredBooks(sampleBooks);
+      console.error('❌ [HomePage] Failed to fetch books:', err);
+      if (err.response) {
+        console.error('   Response status:', err.response.status);
+        console.error('   Response data:', err.response.data);
+        console.error('   Response headers:', err.response.headers);
+      } else if (err.request) {
+        console.error('   ❌ Network error - no response received from server');
+        console.error('   Request URL:', err.config?.url);
+        console.error('   💡 Check if backend is running and accessible at:', API_BASE_URL);
+        console.error('   💡 In Docker, ensure ports are correctly mapped and CORS is configured');
+      } else {
+        console.error('   Error:', err.message);
+      }
+      
+      // Show empty state instead of sample books to encourage API fix
+      setBooks([]);
+      setFilteredBooks([]);
     } finally {
       setLoading(false);
+      fetchRef.current = false; // Reset fetch flag
     }
   };
 
