@@ -5,6 +5,7 @@ import axios from 'axios';
 import Layout from '../src/components/layout/Layout.js';
 import { useAuth } from '../src/contexts/AuthContext';
 import withAuth from '../src/components/withAuth';
+import { isMember } from '../src/utils/roleUtils';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -82,12 +83,34 @@ function SearchPage() {
           }`}>
             {book.status || 'available'}
           </span>
-          <Link
-            href={`/books/${book.id}`}
-            className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
-          >
-            View Details →
-          </Link>
+          <div className="flex gap-2">
+            {user && isMember(user) && (book.status === 'available' || book.status?.toLowerCase() === 'available' || !book.status) && (
+              <button
+                onClick={async () => {
+                  try {
+                    const token = localStorage.getItem('token');
+                    await axios.post(
+                      `${API_BASE_URL}/transactions`,
+                      { bookId: book.id, type: 'borrow' },
+                      { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                    alert('Book borrowed successfully!');
+                  } catch (error) {
+                    alert(error.response?.data?.message || 'Failed to borrow book');
+                  }
+                }}
+                className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded font-medium"
+              >
+                Borrow
+              </button>
+            )}
+            <Link
+              href={`/books/${book.id}`}
+              className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+              Details →
+            </Link>
+          </div>
         </div>
       </div>
     </div>

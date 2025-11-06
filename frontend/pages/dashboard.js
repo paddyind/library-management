@@ -54,7 +54,7 @@ function Dashboard() {
           headers: { Authorization: `Bearer ${token}` },
         })) : Promise.resolve({ value: { data: [] } }),
         // Use correct transactions endpoint based on role
-        token ? (isAdmin 
+        token ? ((isAdmin || isLibrarian)
           ? axios.get(`${API_BASE_URL}/transactions`, {
               headers: { Authorization: `Bearer ${token}` },
             }).catch(() => Promise.resolve({ data: [] }))
@@ -68,9 +68,9 @@ function Dashboard() {
       const members = membersRes.status === 'fulfilled' ? (membersRes.value.data || []) : [];
       const transactions = transactionsRes.status === 'fulfilled' ? (transactionsRes.value.data || []) : [];
 
-      // Calculate active loans (transactions without returnDate)
+      // Calculate active loans (transactions with status 'active' or 'pending_return_approval')
       const activeLoans = Array.isArray(transactions) 
-        ? transactions.filter(t => t && !t.returnDate).length 
+        ? transactions.filter(t => t && (t.status === 'active' || t.status === 'pending_return_approval')).length 
         : 0;
 
       setStats({
@@ -239,7 +239,7 @@ function Dashboard() {
 
               {isAdminOrLib && (
                 <a
-                  href="/users"
+                  href="/settings?tab=users"
                   className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500"
                 >
                   <div className="flex-shrink-0">

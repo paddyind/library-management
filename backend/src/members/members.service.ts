@@ -37,7 +37,14 @@ export class MembersService {
   }
 
   async create(createMemberDto: CreateMemberDto, role: MemberRole = MemberRole.MEMBER): Promise<Member> {
-    const { email, password, name, phone, dateOfBirth, address, preferences, paymentMethod, paymentDetails } = createMemberDto;
+    const { email, password, name } = createMemberDto;
+    // Optional fields that may not be in DTO
+    const phone = (createMemberDto as any).phone;
+    const dateOfBirth = (createMemberDto as any).dateOfBirth;
+    const address = (createMemberDto as any).address;
+    const preferences = (createMemberDto as any).preferences;
+    const paymentMethod = (createMemberDto as any).paymentMethod;
+    const paymentDetails = (createMemberDto as any).paymentDetails;
 
     console.log(`🔍 [MembersService] create: Checking if user exists with email: ${email}`);
     const { data: existingMember, error: existingMemberError } = await this.supabaseService
@@ -148,10 +155,21 @@ export class MembersService {
         else if (normalizedRole === 'librarian') normalizedRole = MemberRole.LIBRARIAN;
         else normalizedRole = MemberRole.MEMBER;
         
+        // Convert dateOfBirth from string to Date if present
+        const dateOfBirth = user.dateOfBirth 
+          ? (typeof user.dateOfBirth === 'string' ? new Date(user.dateOfBirth) : new Date(user.dateOfBirth))
+          : new Date();
+        
         return {
           id: user.id,
           name: user.name,
           email: user.email,
+          phone: user.phone || '',
+          dateOfBirth,
+          address: user.address || '',
+          preferences: user.preferences,
+          paymentMethod: user.paymentMethod,
+          paymentDetails: user.paymentDetails,
           role: normalizedRole,
           createdAt: new Date(user.createdAt),
           updatedAt: new Date(user.updatedAt),
@@ -233,10 +251,25 @@ export class MembersService {
     } else {
       normalizedRole = MemberRole.MEMBER;
     }
+    // Convert dateOfBirth from string to Date if present
+    const dateOfBirth = member.dateOfBirth 
+      ? (typeof member.dateOfBirth === 'string' ? new Date(member.dateOfBirth) : new Date())
+      : new Date();
+    
     return {
-      ...member,
+      id: member.id,
+      name: member.name,
+      email: member.email,
+      phone: member.phone || '',
+      dateOfBirth,
+      address: member.address || '',
+      preferences: member.preferences,
+      paymentMethod: (member as any).paymentMethod,
+      paymentDetails: (member as any).paymentDetails,
       role: normalizedRole,
-    } as Member;
+      createdAt: member.createdAt instanceof Date ? member.createdAt : new Date(member.createdAt),
+      updatedAt: member.updatedAt instanceof Date ? member.updatedAt : new Date(member.updatedAt),
+    };
   }
 
   async findByEmail(email: string): Promise<Member | undefined> {
@@ -264,29 +297,99 @@ export class MembersService {
 
   async update(id: string, updateMemberDto: UpdateMemberDto): Promise<Member> {
     console.log(`🔍 [MembersService] update: Updating user id: ${id}`);
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('users')
-      .update(updateMemberDto)
-      .eq('id', id)
-      .select()
-      .single();
+    const storage = this.getPreferredStorage();
+    
+    if (storage === 'supabase') {
+      try {
+        const { data, error } = await this.supabaseService
+          .getClient()
+          .from('users')
+          .update(updateMemberDto)
+          .eq('id', id)
+          .select()
+          .single();
 
-    if (error) {
-      console.error(`❌ [MembersService] update error:`, error.message, error.code, error);
-      if (error.code === 'PGRST116') {
-        throw new NotFoundException(`Member with ID "${id}" not found`);
+        if (error) {
+          console.warn('⚠️ Supabase update error, falling back to SQLite:', error.message);
+          return this.updateInSqlite(id, updateMemberDto);
+        }
+
+        if (!data) {
+          console.warn('⚠️ Supabase update: No rows updated, falling back to SQLite');
+          return this.updateInSqlite(id, updateMemberDto);
+        }
+
+        console.log(`✅ [MembersService] update: User updated successfully in Supabase`);
+        return data;
+      } catch (error: any) {
+        console.warn('⚠️ Supabase connection error, falling back to SQLite:', error.message);
+        return this.updateInSqlite(id, updateMemberDto);
       }
-      throw new NotFoundException(`Member with ID "${id}" not found: ${error.message}`);
     }
+    
+    return this.updateInSqlite(id, updateMemberDto);
+  }
 
-    if (!data) {
-      console.warn(`⚠️ [MembersService] update: No rows updated for id: ${id}`);
+  private updateInSqlite(id: string, updateMemberDto: UpdateMemberDto): Member {
+    if (!this.sqliteService.isReady()) {
       throw new NotFoundException(`Member with ID "${id}" not found`);
     }
 
-    console.log(`✅ [MembersService] update: User updated successfully`);
-    return data;
+    try {
+      const db = this.sqliteService.getDatabase();
+      const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
+      
+      if (!user) {
+        throw new NotFoundException(`Member with ID "${id}" not found`);
+      }
+
+      // Build update query dynamically based on provided fields
+      const updates: string[] = [];
+      const values: any[] = [];
+
+      if (updateMemberDto.name !== undefined) {
+        updates.push('name = ?');
+        values.push(updateMemberDto.name);
+      }
+      if (updateMemberDto.phone !== undefined) {
+        updates.push('phone = ?');
+        values.push(updateMemberDto.phone);
+      }
+      if (updateMemberDto.dateOfBirth !== undefined) {
+        updates.push('dateOfBirth = ?');
+        values.push(updateMemberDto.dateOfBirth);
+      }
+      if (updateMemberDto.address !== undefined) {
+        updates.push('address = ?');
+        values.push(updateMemberDto.address);
+      }
+      if (updateMemberDto.preferences !== undefined) {
+        updates.push('preferences = ?');
+        values.push(updateMemberDto.preferences);
+      }
+      
+      if (updates.length === 0) {
+        // No updates to perform, return existing user
+        return this.findOneFromSqlite(id);
+      }
+
+      // Always update updatedAt
+      updates.push('updatedAt = ?');
+      values.push(new Date().toISOString());
+      values.push(id);
+
+      const updateQuery = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
+      db.prepare(updateQuery).run(...values);
+
+      // Return updated user
+      return this.findOneFromSqlite(id);
+    } catch (error: any) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error('⚠️ SQLite update error:', error.message);
+      throw new NotFoundException(`Member with ID "${id}" not found`);
+    }
   }
 
   async remove(id: string): Promise<void> {

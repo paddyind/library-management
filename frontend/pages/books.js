@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import Layout from '../src/components/layout/Layout.js';
 import axios from 'axios';
 import withAuth from '../src/components/withAuth';
+import { isAdminOrLibrarian, isMember } from '../src/utils/roleUtils';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -16,6 +17,7 @@ function BooksPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [error, setError] = useState(null);
+  const [borrowingBookId, setBorrowingBookId] = useState(null);
 
   useEffect(() => {
     fetchBooks();
@@ -46,17 +48,37 @@ function BooksPage() {
       const response = await axios.get(`${API_BASE_URL}/transactions/my-transactions`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setMyTransactions(response.data.filter(t => !t.returnDate));
+      // Filter to show active and pending_return_approval transactions (still on loan)
+      setMyTransactions(response.data.filter(t => 
+        t.status === 'active' || t.status === 'pending_return_approval'
+      ));
     } catch (err) {
       console.error('Error fetching transactions:', err);
     }
   };
 
   const handleBorrow = async (bookId) => {
+    if (borrowingBookId) return; // Prevent multiple clicks
+    
     try {
       const token = localStorage.getItem('token');
       if (!token) {
         router.push('/login?redirect=/books');
+        return;
+      }
+      
+      setBorrowingBookId(bookId);
+      
+      // Check if user already has max active loans (prevent unnecessary API call)
+      const activeLoans = myTransactions.filter(t => 
+        t.status === 'active' || t.status === 'pending_return_approval'
+      );
+      
+      // Gold plan: 2 books at a time (default for demo_member)
+      const maxConcurrentLoans = 2;
+      if (activeLoans.length >= maxConcurrentLoans) {
+        alert(`You can only borrow ${maxConcurrentLoans} book(s) at a time. You currently have ${activeLoans.length} active loan(s).`);
+        setBorrowingBookId(null);
         return;
       }
       
@@ -71,6 +93,8 @@ function BooksPage() {
     } catch (err) {
       console.error('Error borrowing book:', err);
       alert(err.response?.data?.message || 'Failed to borrow book');
+    } finally {
+      setBorrowingBookId(null);
     }
   };
 
@@ -94,8 +118,14 @@ function BooksPage() {
   const filteredBooks = books.filter(book => {
     const matchesSearch = book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         book.isbn.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterStatus === 'all' || book.status === filterStatus;
+                         (book.isbn && book.isbn.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    // Normalize status values for comparison (handle both enum and lowercase)
+    const bookStatus = (book.status || '').toLowerCase();
+    const isAvailable = book.isAvailable || bookStatus === 'available';
+    const normalizedStatus = isAvailable ? 'available' : 'borrowed';
+    
+    const matchesFilter = filterStatus === 'all' || normalizedStatus === filterStatus.toLowerCase();
     return matchesSearch && matchesFilter;
   });
 
@@ -118,14 +148,22 @@ function BooksPage() {
                   <p className="text-sm text-gray-600 mb-2">by {transaction.book?.author || 'Unknown'}</p>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-500">
-                      Due: {new Date(transaction.dueDate).toLocaleDateString()}
+                      Due: {transaction.dueDate ? new Date(transaction.dueDate).toLocaleDateString() : 'N/A'}
+                      {transaction.status === 'pending_return_approval' && (
+                        <span className="ml-2 text-orange-600 font-semibold">(Pending Approval)</span>
+                      )}
                     </span>
-                    <button
-                      onClick={() => handleReturn(transaction.id)}
-                      className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium"
-                    >
-                      Return
-                    </button>
+                    {transaction.status === 'active' && (
+                      <button
+                        onClick={() => handleReturn(transaction.id)}
+                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium"
+                      >
+                        Return
+                      </button>
+                    )}
+                    {transaction.status === 'pending_return_approval' && (
+                      <span className="text-orange-600 text-xs font-medium">Awaiting Approval</span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -198,44 +236,80 @@ function BooksPage() {
                     
                     <div className="flex items-center justify-between mb-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        book.status === 'available' 
+                        (book.status === 'available' || book.isAvailable) 
                           ? 'bg-green-100 text-green-800' 
-                          : book.status === 'borrowed'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
                       }`}>
-                        {book.status}
+                        {(book.status === 'available' || book.isAvailable) ? 'Available' : 'Out of Stock'}
                       </span>
                       <span className="text-xs text-gray-500">
-                        {book.status === 'available' ? '1 available' : '0 available'}
+                        {(book.status === 'available' || book.isAvailable) ? '1 available' : '0 available'}
                       </span>
                     </div>
 
-                    {user && book.status === 'available' && (
+                    {user && isMember(user) && (
+                      <div className="space-y-2">
+                        {/* Check if user has reached loan limit */}
+                        {(() => {
+                          const activeLoans = myTransactions.filter(t => 
+                            t.status === 'active' || t.status === 'pending_return_approval'
+                          );
+                          const maxConcurrentLoans = 2; // Gold plan default
+                          const canBorrow = activeLoans.length < maxConcurrentLoans;
+                          const isAvailable = book.status === 'available' || book.isAvailable || book.status?.toLowerCase() === 'available';
+                          const isBorrowing = borrowingBookId === book.id;
+                          
+                          return (
+                            <>
+                              <button
+                                onClick={() => handleBorrow(book.id)}
+                                disabled={!isAvailable || !canBorrow || isBorrowing}
+                                className={`w-full py-2 px-4 rounded-md text-sm font-medium transition-colors duration-200 ${
+                                  isBorrowing
+                                    ? 'bg-indigo-400 text-white cursor-wait'
+                                    : !isAvailable || !canBorrow
+                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                                }`}
+                              >
+                                {isBorrowing ? 'Borrowing...' : !canBorrow ? `Loan Limit Reached (${activeLoans.length}/${maxConcurrentLoans})` : 'Borrow Book'}
+                              </button>
+                              <button
+                                onClick={() => router.push(`/books/${book.id}`)}
+                                className="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-md text-sm font-medium transition-colors duration-200"
+                              >
+                                Details
+                              </button>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                    
+                    {user && isAdminOrLibrarian(user) && (
                       <button
-                        onClick={() => handleBorrow(book.id)}
-                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md text-sm font-medium transition-colors duration-200"
+                        onClick={() => router.push(`/books/${book.id}`)}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md text-sm font-medium transition-colors duration-200"
                       >
-                        Borrow Book
+                        Manage
                       </button>
                     )}
                     
                     {!user && (
-                      <button
-                        onClick={() => router.push('/login?redirect=/books')}
-                        className="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-md text-sm font-medium transition-colors duration-200"
-                      >
-                        Login to Borrow
-                      </button>
-                    )}
-
-                    {user && book.status !== 'available' && (
-                      <button
-                        disabled
-                        className="w-full bg-gray-300 text-gray-500 py-2 px-4 rounded-md text-sm font-medium cursor-not-allowed"
-                      >
-                        Not Available
-                      </button>
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => router.push('/login?redirect=/books')}
+                          className="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-md text-sm font-medium transition-colors duration-200"
+                        >
+                          Login to Borrow
+                        </button>
+                        <button
+                          onClick={() => router.push(`/books/${book.id}`)}
+                          className="w-full bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-md text-sm font-medium transition-colors duration-200"
+                        >
+                          Details
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

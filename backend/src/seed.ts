@@ -897,7 +897,7 @@ function seedSqlite() {
     ].filter(b => !existingISBNs.has(b.isbn));
 
     const insertBook = db.prepare(`
-      INSERT OR IGNORE INTO books (id, title, author, isbn, ownerId, createdAt, updatedAt)
+      INSERT OR IGNORE INTO books (id, title, author, isbn, owner_id, createdAt, updatedAt)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
@@ -927,7 +927,7 @@ function seedSqlite() {
     const existingGroupNames = new Set(existingGroups.map(g => g.name));
     
     const insertGroup = db.prepare(`
-      INSERT OR IGNORE INTO groups (name, description, permissions, createdAt, updatedAt)
+      INSERT OR IGNORE INTO groups (name, description, permissions, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
     `);
 

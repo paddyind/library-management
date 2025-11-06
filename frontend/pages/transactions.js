@@ -1,16 +1,80 @@
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import Layout from '../src/components/layout/Layout.js';
 import { useAuth } from '../src/contexts/AuthContext';
 import axios from 'axios';
 import withAuth from '../src/components/withAuth';
+import { isAdminOrLibrarian, isMember } from '../src/utils/roleUtils';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 function TransactionsPage() {
+  const router = useRouter();
+  const { bookId } = router.query;
   const { user, loading: authLoading } = useAuth();
   const [transactions, setTransactions] = useState([]);
+  const [allTransactions, setAllTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const handleReturn = async (transactionId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(
+        `${API_BASE_URL}/transactions/${transactionId}/return`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert('Return request submitted! Awaiting approval.');
+      // Refresh transactions
+      const url = user?.role?.toLowerCase() === 'admin' 
+        ? `${API_BASE_URL}/transactions` 
+        : `${API_BASE_URL}/transactions/my-transactions`;
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const allData = response.data || [];
+      setAllTransactions(allData);
+      if (statusFilter === 'all') {
+        setTransactions(allData.slice(0, 10));
+      } else {
+        setTransactions(allData.filter(t => t.status === statusFilter));
+      }
+    } catch (err) {
+      console.error('Failed to return book:', err);
+      alert(err.response?.data?.message || 'Failed to return book');
+    }
+  };
+
+  const handleRenew = async (transactionId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(
+        `${API_BASE_URL}/transactions/${transactionId}/renew`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert('Book renewed successfully!');
+      // Refresh transactions
+      const url = user?.role?.toLowerCase() === 'admin' 
+        ? `${API_BASE_URL}/transactions` 
+        : `${API_BASE_URL}/transactions/my-transactions`;
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const allData = response.data || [];
+      setAllTransactions(allData);
+      if (statusFilter === 'all') {
+        setTransactions(allData.slice(0, 10));
+      } else {
+        setTransactions(allData.filter(t => t.status === statusFilter));
+      }
+    } catch (err) {
+      console.error('Failed to renew book:', err);
+      alert(err.response?.data?.message || 'Failed to renew book');
+    }
+  };
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -32,15 +96,29 @@ function TransactionsPage() {
           return;
         }
 
-        const url = user?.role?.toLowerCase() === 'admin' 
-          ? `${API_BASE_URL}/transactions` 
+        const isAdminOrLibrarian = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'librarian';
+        const url = isAdminOrLibrarian
+          ? `${API_BASE_URL}/transactions${bookId ? `?bookId=${bookId}` : ''}` 
           : `${API_BASE_URL}/transactions/my-transactions`;
         
         const response = await axios.get(url, {
           headers: { Authorization: `Bearer ${token}` },
         });
         
-        setTransactions(response.data || []);
+        let allData = response.data || [];
+        
+        // For members, still filter by bookId on frontend if needed
+        if (bookId && !isAdminOrLibrarian) {
+          allData = allData.filter(t => t.bookId === bookId);
+        }
+        
+        setAllTransactions(allData);
+        // Show recent 10 by default, or filter by status
+        if (statusFilter === 'all') {
+          setTransactions(allData.slice(0, 10));
+        } else {
+          setTransactions(allData.filter(t => t.status === statusFilter));
+        }
       } catch (err) {
         console.error('Failed to fetch transactions:', err);
         const errorMessage = err.response?.data?.message 
@@ -54,9 +132,9 @@ function TransactionsPage() {
     };
     
     if (!authLoading) {
-      fetchTransactions();
-    }
-  }, [user, authLoading]);
+        fetchTransactions();
+        }
+      }, [user, authLoading, statusFilter, bookId]); // Added bookId to dependencies
 
   if (authLoading || loading) {
     return (
@@ -95,11 +173,42 @@ function TransactionsPage() {
     <Layout>
       <div className="py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {bookId && (
+            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-md p-4">
+              <p className="text-sm text-blue-800">
+                Showing transactions for book ID: <strong>{bookId}</strong>
+                <button onClick={() => router.push('/transactions')} className="ml-2 text-blue-600 hover:text-blue-800 underline">
+                  Clear filter
+                </button>
+              </p>
+            </div>
+          )}
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-semibold text-gray-900">Transactions</h1>
-            <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-              New Transaction
-            </button>
+            <div className="flex items-center gap-4">
+              <label htmlFor="statusFilter" className="text-sm font-medium text-gray-700">
+                Filter by Status:
+              </label>
+              <select
+                id="statusFilter"
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  if (e.target.value === 'all') {
+                    setTransactions(allTransactions.slice(0, 10));
+                  } else {
+                    setTransactions(allTransactions.filter(t => t.status === e.target.value));
+                  }
+                }}
+                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="all">All (Recent 10)</option>
+                <option value="active">Active</option>
+                <option value="pending_return_approval">Pending Return Approval</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
           </div>
 
           {transactions.length === 0 ? (
@@ -118,45 +227,86 @@ function TransactionsPage() {
                     <div className="px-4 py-4 sm:px-6">
                       <div className="flex items-center justify-between">
                         <div className="flex flex-col">
-                          <p className="text-sm font-medium text-indigo-600 truncate">
+                          <a
+                            href={`/books/${transaction.bookId}`}
+                            className="text-sm font-medium text-indigo-600 hover:text-indigo-800 truncate cursor-pointer"
+                          >
                             {transaction.book?.title || 'Unknown Book'}
-                          </p>
+                          </a>
                           <p className="text-sm text-gray-500">
                             ISBN: {transaction.book?.isbn || 'N/A'}
                           </p>
                         </div>
                         <div className="ml-2 flex-shrink-0 flex">
-                          <p className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            transaction.status === 'active'
-                              ? 'bg-green-100 text-green-800'
-                              : transaction.status === 'overdue'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {transaction.status}
-                          </p>
+                              <p className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                transaction.status === 'active'
+                                  ? 'bg-green-100 text-green-800'
+                                  : transaction.status === 'pending_return_approval'
+                                  ? 'bg-orange-100 text-orange-800'
+                                  : transaction.status === 'overdue'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {transaction.status === 'pending_return_approval' ? 'Pending Return Approval' : transaction.status}
+                              </p>
                         </div>
                       </div>
                       <div className="mt-2 sm:flex sm:justify-between">
                         <div className="sm:flex">
                           <p className="flex items-center text-sm text-gray-500">
-                            Member: {transaction.member?.name || 'Unknown'} ({transaction.member?.membershipId || 'N/A'})
+                            {(user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'librarian') && transaction.member ? (
+                              <>
+                                Borrowed by: {transaction.member.name || 'Unknown'} 
+                                {transaction.member.phone && ` (${transaction.member.phone})`}
+                              </>
+                            ) : (
+                              <>
+                                {transaction.borrowedDate ? `Borrowed: ${new Date(transaction.borrowedDate).toLocaleDateString()}` : 'N/A'}
+                              </>
+                            )}
                           </p>
                         </div>
                         <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
                           <p>
-                            Checkout: {transaction.checkoutDate || 'N/A'} | Due: {transaction.dueDate || 'N/A'}
+                            {transaction.borrowedDate ? `Borrowed: ${new Date(transaction.borrowedDate).toLocaleDateString()}` : 'N/A'} | 
+                            Due: {transaction.dueDate ? new Date(transaction.dueDate).toLocaleDateString() : 'N/A'}
                           </p>
                         </div>
                       </div>
-                      <div className="mt-2 flex justify-end space-x-4">
-                        <button className="text-sm text-blue-600 hover:text-blue-900">
-                          Renew
-                        </button>
-                        <button className="text-sm text-green-600 hover:text-green-900">
-                          Return
-                        </button>
-                      </div>
+                          {(transaction.status === 'active' || transaction.status === 'pending_return_approval') && transaction.type === 'borrow' && isMember(user) && (
+                            <div className="mt-2 flex justify-end space-x-4">
+                              {transaction.status === 'active' && (
+                                <>
+                                  {/* Show renew button only if within 1-2 days of due date */}
+                                  {transaction.dueDate && (() => {
+                                    const dueDate = new Date(transaction.dueDate);
+                                    const now = new Date();
+                                    const daysUntilDue = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                                    if (daysUntilDue >= 1 && daysUntilDue <= 2) {
+                                      return (
+                                        <button
+                                          onClick={() => handleRenew(transaction.id)}
+                                          className="text-sm text-blue-600 hover:text-blue-900 font-medium"
+                                        >
+                                          Renew
+                                        </button>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                  <button
+                                    onClick={() => handleReturn(transaction.id)}
+                                    className="text-sm text-green-600 hover:text-green-900 font-medium"
+                                  >
+                                    Return
+                                  </button>
+                                </>
+                              )}
+                              {transaction.status === 'pending_return_approval' && (
+                                <span className="text-sm text-orange-600 font-medium">Return Pending Approval</span>
+                              )}
+                            </div>
+                          )}
                     </div>
                   </li>
                 ))}

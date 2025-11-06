@@ -45,6 +45,26 @@ export class UpdateMemberDto {
   @IsOptional()
   password?: string;
 
+  @ApiProperty({ example: '+1234567890', description: 'Phone number (required)' })
+  @IsString()
+  @IsOptional()
+  phone?: string;
+
+  @ApiProperty({ example: '1990-01-01', description: 'Date of birth (YYYY-MM-DD)', required: false })
+  @IsString()
+  @IsOptional()
+  dateOfBirth?: string;
+
+  @ApiProperty({ example: '123 Main St, City, State', description: 'Physical address', required: false })
+  @IsString()
+  @IsOptional()
+  address?: string;
+
+  @ApiProperty({ example: 'Prefers fiction books', description: 'User preferences', required: false })
+  @IsString()
+  @IsOptional()
+  preferences?: string;
+
   @ApiProperty({ enum: MemberRole, example: MemberRole.MEMBER, required: false })
   @IsEnum(MemberRole)
   @IsOptional()

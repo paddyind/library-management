@@ -62,6 +62,8 @@ async function bootstrap() {
       - **Reservations**: Book reservation system
       - **Profile**: User profile management
       - **Groups**: User group management with permissions
+      - **Reviews**: Book reviews and feedback system
+      - **Ratings**: Book ratings (1-5 stars) system
       
       ### Authentication
       Most endpoints require authentication. Use the login endpoint to obtain a JWT token,
@@ -71,7 +73,7 @@ async function bootstrap() {
       - **Admin**: Full system access including user management
       - **Member**: Standard user access for borrowing books
     `)
-    .setVersion('1.0.6')
+    .setVersion('1.0.10')
     .setContact(
       'Library Management System',
       'https://github.com/paddyind/library-management',
@@ -96,6 +98,8 @@ async function bootstrap() {
     .addTag('Notifications', 'User notification system')
     .addTag('Profile', 'User profile management')
     .addTag('Reservations', 'Book reservation system')
+    .addTag('Reviews', 'Book reviews and feedback')
+    .addTag('Ratings', 'Book ratings (1-5 stars)')
     .addTag('Groups', 'User group and permission management')
     .addTag('Search', 'Search functionality for books and members')
     .build();

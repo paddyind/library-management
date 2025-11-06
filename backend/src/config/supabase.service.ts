@@ -25,7 +25,7 @@ export class SupabaseService implements OnModuleInit {
           const urlString = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
           try {
             // Use longer timeout for health check, shorter for regular requests
-            const timeout = this.healthCheckCompleted ? 5000 : 10000;
+            const timeout = this.healthCheckCompleted ? 50000 : 100000;
             
             const urlObj = new URL(urlString);
             
@@ -65,14 +65,15 @@ export class SupabaseService implements OnModuleInit {
                   }
                 }
                 
-                // Debug: log headers being sent (but not the actual key value)
-                if (requestHeaders.apikey) {
-                  console.log('🔑 Sending request with apikey header');
-                } else {
-                  console.warn('⚠️  No apikey header found! Attempting to use configured key');
+                // Only log if apikey is missing (warning case)
+                // Don't log on every request to reduce noise
+                if (!requestHeaders.apikey && !requestHeaders.Authorization) {
                   if (supabaseKey) {
                     requestHeaders.apikey = supabaseKey;
-                    console.log('✅ Added apikey from config');
+                    // Only log warning if we had to add it
+                    console.warn('⚠️  No apikey header found! Added apikey from config');
+                  } else {
+                    console.warn('⚠️  No apikey header found and no configured key available!');
                   }
                 }
                 

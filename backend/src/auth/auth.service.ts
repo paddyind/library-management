@@ -39,7 +39,7 @@ export class AuthService {
   }
 
   async signUp(signUpDto: SignUpDto) {
-    const { email, password, name } = signUpDto;
+    const { email, password, name, phone, dateOfBirth, address, preferences } = signUpDto;
     const storage = this.getPreferredStorage();
     
     // Check if both databases are available
@@ -64,6 +64,22 @@ export class AuthService {
         } else {
           console.log('✅ Supabase registration successful for:', email);
           
+          // Create user profile in users table with all fields
+          if (data.user?.id) {
+            await this.supabaseService.getClient()
+              .from('users')
+              .insert({
+                id: data.user.id,
+                email: data.user.email || email,
+                name: name || email.split('@')[0],
+                role: MemberRole.MEMBER,
+                phone: phone || null,
+                dateOfBirth: dateOfBirth || null,
+                address: address || null,
+                preferences: preferences || null,
+              });
+          }
+          
           primaryResult = {
             id: data.user?.id || '',
             email: data.user?.email || email,
@@ -85,6 +101,10 @@ export class AuthService {
           password,
           name: name || email.split('@')[0],
           role: MemberRole.MEMBER,
+          phone: phone || '',
+          dateOfBirth: dateOfBirth || '',
+          address: address || '',
+          preferences: preferences || '',
         });
         
         primaryResult = {
@@ -117,6 +137,10 @@ export class AuthService {
                 password, // Same password - will be hashed
                 name: primaryResult.name,
                 role: primaryResult.role,
+                phone: phone || '',
+                dateOfBirth: dateOfBirth || '',
+                address: address || '',
+                preferences: preferences || '',
               });
               console.log('✅ User also created in SQLite for sync');
             }
@@ -140,6 +164,10 @@ export class AuthService {
                   email: primaryResult.email,
                   name: primaryResult.name,
                   role: primaryResult.role,
+                  phone: phone || null,
+                  dateOfBirth: dateOfBirth || null,
+                  address: address || null,
+                  preferences: preferences || null,
                 });
               console.log('✅ User also created in Supabase for sync');
             }
@@ -163,7 +191,7 @@ export class AuthService {
   }
 
   private sqliteSignUp(signUpDto: SignUpDto) {
-    const { email, password, name } = signUpDto;
+    const { email, password, name, phone, dateOfBirth, address, preferences } = signUpDto;
     
     if (!this.sqliteService.isReady()) {
       throw new Error('SQLite database is not available');
@@ -184,6 +212,10 @@ export class AuthService {
         password,
         name: name || email.split('@')[0],
         role: MemberRole.MEMBER,
+        phone: phone || '',
+        dateOfBirth: dateOfBirth || '',
+        address: address || '',
+        preferences: preferences || '',
       });
 
       // Generate JWT token

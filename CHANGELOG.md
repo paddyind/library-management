@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.10] - 2025-11-05
+
+### Added
+- **Settings Page Reorganization**: Users, Groups, and Book Management are now integrated as tabs within Settings page instead of separate pages
+- **Book Management in Settings**: Librarians and Admins can manage books directly from Settings > Manage Books tab
+- **Users Management in Settings**: Admins can manage users directly from Settings > Users tab
+- **Groups Management in Settings**: Admins can manage groups directly from Settings > Groups tab
+- **Reviews and Ratings API**: Full backend implementation with SQLite and Supabase dual-database support
+- **Book Details Page**: Complete implementation with reviews and ratings display
+- **Database Migrations**: Added migration 004 for reviews and ratings tables (both Supabase and SQLite)
+- **Swagger Documentation**: Added Reviews and Ratings API tags and descriptions
+
+### Changed
+- **Settings Navigation**: Removed separate `/users`, `/groups`, and `/admin/books` routes - all accessible via Settings tabs
+- **Reviews Service**: Added SQLite fallback support for dual-database compatibility
+- **Ratings Service**: Added SQLite fallback support for dual-database compatibility
+- **Book Details API**: Fixed query to remove invalid relation references
+- **Help Page**: Fixed membership plan display format (concurrent books and max books on separate lines)
+
+### Fixed
+- **Book Details 404 Error**: Fixed `findOne` method to use correct Supabase query without invalid relations
+- **Reviews API 500 Error**: Added database tables and SQLite fallback support
+- **Ratings API 500 Error**: Added database tables and SQLite fallback support
+- **Backend Compilation Errors**: Removed problematic cleanup script causing TypeScript errors
+- **Swagger Configuration**: Added Reviews and Ratings tags to API documentation
+
 ## [v1.0.9] - 2025-11-03
 
 ### Added

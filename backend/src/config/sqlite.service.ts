@@ -11,6 +11,10 @@ export interface User {
   password: string;
   name: string;
   role: string;
+  phone?: string;
+  dateOfBirth?: string;
+  address?: string;
+  preferences?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -95,10 +99,22 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
         password TEXT NOT NULL,
         name TEXT NOT NULL,
         role TEXT NOT NULL DEFAULT 'member',
+        phone TEXT,
+        dateOfBirth TEXT,
+        address TEXT,
+        preferences TEXT,
+        is_demo INTEGER DEFAULT 0,
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL
       )
     `);
+    
+    // Add is_demo column if it doesn't exist (for existing databases)
+    try {
+      this.db.exec(`ALTER TABLE users ADD COLUMN is_demo INTEGER DEFAULT 0`);
+    } catch (e) {
+      // Column might already exist, ignore
+    }
 
     // Create index on email for faster lookups
     this.db.exec(`
@@ -113,10 +129,26 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
         author TEXT NOT NULL,
         isbn TEXT,
         owner_id TEXT NOT NULL,
+        status TEXT DEFAULT 'available',
+        count INTEGER DEFAULT 1,
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL
       )
     `);
+    
+    // Add count column if it doesn't exist (for existing databases)
+    try {
+      this.db.exec(`ALTER TABLE books ADD COLUMN count INTEGER DEFAULT 1`);
+    } catch (e) {
+      // Column might already exist, ignore
+    }
+    
+    // Add status column if it doesn't exist (for existing databases)
+    try {
+      this.db.exec(`ALTER TABLE books ADD COLUMN status TEXT DEFAULT 'available'`);
+    } catch (e) {
+      // Column might already exist, ignore
+    }
 
     // Create indexes on books table for faster lookups
     this.db.exec(`
@@ -163,6 +195,90 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_group_members_member_id ON group_members(member_id)
     `);
+
+    // Create transactions table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS transactions (
+        id TEXT PRIMARY KEY,
+        bookId TEXT NOT NULL,
+        memberId TEXT NOT NULL,
+        type TEXT NOT NULL CHECK (type IN ('borrow', 'return', 'reserve', 'cancel', 'buy')),
+        status TEXT DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled', 'pending_return_approval')),
+        borrowedDate TEXT,
+        dueDate TEXT,
+        returnDate TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (bookId) REFERENCES books(id) ON DELETE CASCADE,
+        FOREIGN KEY (memberId) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Create indexes for transactions
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_transactions_book_id ON transactions(bookId)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_transactions_member_id ON transactions(memberId)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type)
+    `);
+
+    // Create reviews table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS reviews (
+        id TEXT PRIMARY KEY,
+        bookId TEXT NOT NULL,
+        memberId TEXT NOT NULL,
+        review TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (bookId) REFERENCES books(id) ON DELETE CASCADE,
+        FOREIGN KEY (memberId) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(bookId, memberId)
+      )
+    `);
+
+    // Create indexes for reviews
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_reviews_book_id ON reviews(bookId)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_reviews_member_id ON reviews(memberId)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_reviews_created ON reviews(createdAt)
+    `);
+
+    // Create ratings table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS ratings (
+        id TEXT PRIMARY KEY,
+        bookId TEXT NOT NULL,
+        memberId TEXT NOT NULL,
+        rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (bookId) REFERENCES books(id) ON DELETE CASCADE,
+        FOREIGN KEY (memberId) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(bookId, memberId)
+      )
+    `);
+
+    // Create indexes for ratings
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_ratings_book_id ON ratings(bookId)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_ratings_member_id ON ratings(memberId)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_ratings_rating ON ratings(rating)
+    `);
   }
 
   getDatabase(): Database.Database {
@@ -187,13 +303,36 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
     const id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
 
+    // Build INSERT statement with optional fields
+    const fields = ['id', 'email', 'password', 'name', 'role', 'createdAt', 'updatedAt'];
+    const values = [id, userData.email, hashedPassword, userData.name, userData.role, now, now];
+    
+    // Add optional fields if provided
+    if (userData.phone !== undefined) {
+      fields.push('phone');
+      values.push(userData.phone || '');
+    }
+    if (userData.dateOfBirth !== undefined) {
+      fields.push('dateOfBirth');
+      values.push(userData.dateOfBirth || '');
+    }
+    if (userData.address !== undefined) {
+      fields.push('address');
+      values.push(userData.address || '');
+    }
+    if (userData.preferences !== undefined) {
+      fields.push('preferences');
+      values.push(userData.preferences || '');
+    }
+    
+    const placeholders = fields.map(() => '?').join(', ');
     const stmt = this.db.prepare(`
-      INSERT INTO users (id, email, password, name, role, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (${fields.join(', ')})
+      VALUES (${placeholders})
     `);
 
     try {
-      stmt.run(id, userData.email, hashedPassword, userData.name, userData.role, now, now);
+      stmt.run(...values);
 
       const user = this.findUserByEmail(userData.email);
       if (!user) {
@@ -271,12 +410,12 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
     const now = new Date().toISOString();
 
     const stmt = this.db.prepare(`
-      INSERT INTO books (id, title, author, isbn, ownerId, createdAt, updatedAt, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO books (id, title, author, isbn, ownerId, createdAt, updatedAt, status, count)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     try {
-      stmt.run(id, bookData.title, bookData.author, bookData.isbn || '', bookData.owner_id, now, now, (bookData as any).status || 'available');
+      stmt.run(id, bookData.title, bookData.author, bookData.isbn || '', bookData.owner_id, now, now, (bookData as any).status || 'available', (bookData as any).count ?? 1);
 
       const book = this.findBookById(id);
       if (!book) {

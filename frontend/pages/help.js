@@ -26,10 +26,10 @@ export default function Help() {
       title: 'Membership Plans',
       gradient: 'from-purple-500 to-pink-600',
       items: [
-        { plan: 'Free', price: '₹0', books: '3 books', color: 'text-gray-600' },
-        { plan: 'Bronze', price: '₹299/month', books: '5 books', color: 'text-amber-600' },
-        { plan: 'Silver', price: '₹599/month', books: '10 books', color: 'text-gray-400' },
-        { plan: 'Gold', price: '₹999/month', books: '20 books', color: 'text-yellow-500' },
+        { plan: 'Free', title: 'Free Trial - 1 Week', price: '', concurrent: '1 book', max: 'Max 2 books', color: 'text-gray-600' },
+        { plan: 'Bronze', title: 'Bronze - ₹299/month', price: '', concurrent: '1 book', max: 'Max 5 books', color: 'text-amber-600' },
+        { plan: 'Silver', title: 'Silver - ₹599/month', price: '', concurrent: '2 books', max: 'Max 10 books', color: 'text-gray-400' },
+        { plan: 'Gold', title: 'Gold - ₹999/month', price: '', concurrent: '2 books', max: 'Max 20 books', color: 'text-yellow-500' },
       ]
     },
     {
@@ -156,14 +156,14 @@ export default function Help() {
               <div className="space-y-4">
                 {features[1].items.map((item, idx) => (
                   <div key={idx} className="p-4 rounded-xl bg-gradient-to-r from-gray-50 to-purple-50 hover:from-purple-50 hover:to-pink-50 transition-all duration-200 border border-gray-200 hover:border-purple-300">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className={`text-xl font-bold ${item.color}`}>{item.plan}</p>
-                        <p className="text-sm text-gray-600">{item.books} at a time</p>
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex-1">
+                        <p className={`text-xl font-bold ${item.color}`}>{item.title || item.plan}</p>
                       </div>
-                      <p className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                        {item.price}
-                      </p>
+                    </div>
+                    <div className="space-y-1 text-xs text-gray-600">
+                      <p>• {item.concurrent} per reservation, {item.max}</p>
+                      {/* <p>• {item.max}</p> */}
                     </div>
                   </div>
                 ))}

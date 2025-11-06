@@ -12,8 +12,19 @@ Both use the same logical schema, adapted for their respective SQL dialects.
 
 ## 🗂️ Schema Version
 
-**Current Version**: `1.0.0`  
-**Migration File**: `migrations/supabase/001_initial_schema.sql` or `migrations/sqlite/001_initial_schema.sql`
+**Current Version**: `1.0.2`  
+**Latest Migration**: `005_fix_transaction_status.sql`
+**Migration Files**:
+- `migrations/supabase/001_initial_schema.sql` - Initial schema
+- `migrations/supabase/002_add_is_demo_flag.sql` - Demo user flag
+- `migrations/supabase/003_add_user_fields.sql` - Phone, DOB, address, preferences
+- `migrations/supabase/004_add_book_count.sql` - Book count column
+- `migrations/supabase/004_add_reviews_ratings.sql` - Reviews and ratings tables
+- `migrations/supabase/005_fix_transaction_status.sql` - Fix transaction status constraint
+- `migrations/sqlite/001_initial_schema.sql` - Initial schema
+- `migrations/sqlite/002_add_is_demo_flag.sql` - Demo user flag
+- `migrations/sqlite/003_add_user_fields.sql` - Phone, DOB, address, preferences
+- `migrations/sqlite/004_add_reviews_ratings.sql` - Reviews and ratings tables
 
 ## 📋 Entity Relationship Diagram
 
@@ -35,21 +46,23 @@ Both use the same logical schema, adapted for their respective SQL dialects.
 ┌─────────────────┐      ┌─────────────────┐
 │     books       │      │     groups      │
 │                 │      │                 │
-└────────┬────────┘      └─────────────────┘
-         │
-         │ 1:N
-         ▼
-┌─────────────────┐
-│  transactions   │
-│                 │
-└────────┬─────────┘
-         │
-         │ 1:N
-         ▼
-┌─────────────────┐
-│ reservations   │
-│                │
-└────────────────┘
+└─────┬───────────┘      └─────────────────┘
+      │
+      │ 1:N
+      ├─────────────────┐
+      │                 │
+      ▼                 ▼
+┌─────────────────┐ ┌─────────────────┐
+│  transactions   │ │    reviews      │
+│                 │ │                 │
+└────────┬─────────┘ └────────┬────────┘
+         │                    │
+         │ 1:N                │ 1:N
+         ▼                    ▼
+┌─────────────────┐ ┌─────────────────┐
+│ reservations   │ │    ratings      │
+│                │ │                 │
+└────────────────┘ └─────────────────┘
 
 ┌─────────────────┐
 │ notifications   │
@@ -651,6 +664,89 @@ Planned schema additions:
 
 ---
 
-**Last Updated**: 2025-10-31  
+---
+
+### 8. `reviews`
+
+**Purpose**: User reviews for books
+
+**Supabase Schema**:
+```sql
+CREATE TABLE public.reviews (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    "bookId" UUID NOT NULL REFERENCES public.books(id) ON DELETE CASCADE,
+    "memberId" UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    review TEXT NOT NULL,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT "UQ_review_book_member" UNIQUE ("bookId", "memberId")
+);
+```
+
+**SQLite Schema**:
+```sql
+CREATE TABLE reviews (
+    id TEXT PRIMARY KEY,
+    bookId TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    memberId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    review TEXT NOT NULL,
+    createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+    updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+    CONSTRAINT "UQ_review_book_member" UNIQUE (bookId, memberId)
+);
+```
+
+**Indexes**:
+- `idx_reviews_book_id` - Find all reviews for a book
+- `idx_reviews_member_id` - Find all reviews by a user
+- `idx_reviews_created` - Sort by creation date
+
+**Constraints**:
+- Unique constraint on (bookId, memberId) - one review per user per book
+
+---
+
+### 9. `ratings`
+
+**Purpose**: User ratings for books (1-5 stars)
+
+**Supabase Schema**:
+```sql
+CREATE TABLE public.ratings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    "bookId" UUID NOT NULL REFERENCES public.books(id) ON DELETE CASCADE,
+    "memberId" UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT "UQ_rating_book_member" UNIQUE ("bookId", "memberId")
+);
+```
+
+**SQLite Schema**:
+```sql
+CREATE TABLE ratings (
+    id TEXT PRIMARY KEY,
+    bookId TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    memberId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+    updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+    CONSTRAINT "UQ_rating_book_member" UNIQUE (bookId, memberId)
+);
+```
+
+**Indexes**:
+- `idx_ratings_book_id` - Find all ratings for a book
+- `idx_ratings_member_id` - Find all ratings by a user
+- `idx_ratings_rating` - Filter by rating value
+
+**Constraints**:
+- Rating must be between 1 and 5
+- Unique constraint on (bookId, memberId) - one rating per user per book
+
+---
+
+**Last Updated**: 2025-11-05  
 **Maintained By**: Library Management System Team
 

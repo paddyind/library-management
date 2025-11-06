@@ -297,7 +297,7 @@ SUPABASE_DB_PASSWORD=your_database_password_here
 # Extract password from: postgresql://postgres:[PASSWORD]@...
 
 # Storage preference (optional)
-AUTH_STORAGE=auto  # auto, supabase, or sqlite
+AUTH_STORAGE=sqlite  # auto, supabase, or sqlite (default: sqlite for local dev)
 
 # SQLite path (optional)
 SQLITE_PATH=data/library.sqlite
@@ -368,6 +368,53 @@ docker compose restart backend
 - Check `.env` file has correct credentials
 - For Supabase: Verify network/proxy settings
 - For SQLite: Check file permissions on `data/` directory
+
+### Supabase: "Could not find the table 'public.reviews'" or "'public.ratings'"
+
+**Cause**: Reviews and ratings tables missing from Supabase schema.
+
+**Solution**:
+1. Apply the quick-fix SQL:
+   ```bash
+   # Generate/update migration SQL
+   docker compose exec backend npm run supabase:sql
+   ```
+
+2. Copy SQL from `data/backups/supabase-quick-fix.sql` (or use the combined file)
+
+3. Apply in Supabase Dashboard:
+   - Go to Supabase Dashboard → SQL Editor
+   - Paste and run the SQL
+   - This creates reviews and ratings tables
+
+4. Restart backend:
+   ```bash
+   docker compose restart backend
+   ```
+
+### Supabase: "Failed to return book: Error: TIMEOUT_ERROR"
+
+**Cause**: Return operations timing out due to slow Supabase connection or network issues.
+
+**Solutions**:
+
+1. **Check Network**: VPN or corporate proxy may slow connections
+   - Temporarily disconnect from VPN
+   - Check Supabase status: https://status.supabase.com/
+
+2. **Verify Transaction Status Constraint**: Missing `pending_return_approval` status
+   - Apply migration 005_fix_transaction_status.sql (included in combined migration)
+   - The backend already has increased timeouts (30s for updates, 20s for verification)
+
+3. **Use SQLite Temporarily**:
+   - Set in `.env`: `AUTH_STORAGE=sqlite`
+   - Restart backend: `docker compose restart backend`
+
+4. **Check Supabase RLS Policies**: Ensure transactions table policies allow updates
+   ```sql
+   -- Run in Supabase SQL Editor to verify policies exist
+   SELECT * FROM pg_policies WHERE tablename = 'transactions';
+   ```
 
 ---
 

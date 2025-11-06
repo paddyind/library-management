@@ -35,6 +35,7 @@
     "db:restore": "ts-node data/scripts/db-manager.ts restore",
     "db:status": "ts-node data/scripts/db-manager.ts status",
     "db:cleanup": "ts-node data/scripts/cleanup-database.ts",
+    "db:cleanup-loans": "ts-node data/scripts/cleanup-librarian-loans.ts",
     "db:help": "ts-node data/scripts/db-manager.ts help",
     "supabase:sql": "node data/scripts/apply-supabase-migrations.js",
     "supabase:migrate": "ts-node data/scripts/apply-supabase-migrations-auto.ts"

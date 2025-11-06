@@ -15,8 +15,21 @@ function Profile() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
+    dateOfBirth: '',
+    street: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    country: '',
+    preferences: [],
     role: '',
   });
+  const [otherPreference, setOtherPreference] = useState('');
+  const genreOptions = [
+    'Fiction', 'Non-Fiction', 'Mystery', 'Thriller', 'Romance', 
+    'Science Fiction', 'Fantasy', 'Biography'
+  ];
   const router = useRouter();
 
   useEffect(() => {
@@ -38,9 +51,54 @@ function Profile() {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUser(response.data);
+      
+      // Parse address from string to fields
+      let street = '', city = '', state = '', zipCode = '', country = '';
+      if (response.data.address) {
+        const addressParts = response.data.address.split(',').map(s => s.trim());
+        if (addressParts.length >= 1) street = addressParts[0];
+        if (addressParts.length >= 2) city = addressParts[1];
+        if (addressParts.length >= 3) state = addressParts[2];
+        if (addressParts.length >= 4) zipCode = addressParts[3];
+        if (addressParts.length >= 5) country = addressParts[4];
+      }
+      
+      // Parse preferences from JSON string to array
+      let preferences = [];
+      let otherPref = '';
+      if (response.data.preferences) {
+        try {
+          preferences = JSON.parse(response.data.preferences);
+          // Check if any preference is "Other: ..." and extract it
+          const otherIndex = preferences.findIndex(p => typeof p === 'string' && p.startsWith('Other:'));
+          if (otherIndex !== -1) {
+            otherPref = preferences[otherIndex].replace('Other: ', '');
+            preferences[otherIndex] = 'Other';
+          }
+        } catch (e) {
+          // If not JSON, treat as string and try to parse
+          if (typeof response.data.preferences === 'string') {
+            preferences = response.data.preferences.split(',').map(s => s.trim()).filter(Boolean);
+          }
+        }
+      }
+      
+      setOtherPreference(otherPref);
       setFormData({
         name: response.data.name || '',
         email: response.data.email || '',
+        phone: response.data.phone || '',
+        dateOfBirth: response.data.dateOfBirth 
+          ? (typeof response.data.dateOfBirth === 'string' 
+              ? response.data.dateOfBirth.split('T')[0] 
+              : new Date(response.data.dateOfBirth).toISOString().split('T')[0])
+          : '',
+        street: street,
+        city: city,
+        state: state,
+        zipCode: zipCode,
+        country: country,
+        preferences: preferences,
         role: response.data.role || '',
       });
       setError(null);
@@ -59,9 +117,46 @@ function Profile() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.phone) {
+      alert('Phone number is required');
+      return;
+    }
+    
+    // Validate preferences
+    if (formData.preferences.length > 3) {
+      alert('Please select a maximum of 3 preferences');
+      return;
+    }
+    
+    // Handle "Other" preference
+    let finalPreferences = [...formData.preferences];
+    if (formData.preferences.includes('Other')) {
+      if (otherPreference.trim()) {
+        finalPreferences = formData.preferences.map(p => p === 'Other' ? `Other: ${otherPreference.trim()}` : p);
+      } else {
+        alert('Please enter your preference for "Other" or remove it');
+        return;
+      }
+    }
+    
     const token = localStorage.getItem('token');
     try {
-      await axios.put(`${API_BASE_URL}/profile`, formData, {
+      // Combine address fields into a single string
+      const addressParts = [formData.street, formData.city, formData.state, formData.zipCode, formData.country].filter(Boolean);
+      const address = addressParts.length > 0 ? addressParts.join(', ') : undefined;
+      
+      // Prepare update data - only send fields that can be updated
+      const updateData = {
+        name: formData.name,
+        phone: formData.phone,
+        dateOfBirth: formData.dateOfBirth || undefined,
+        address: address || undefined,
+        preferences: finalPreferences.length > 0 ? JSON.stringify(finalPreferences) : undefined,
+      };
+      
+      await axios.put(`${API_BASE_URL}/profile`, updateData, {
         headers: { Authorization: `Bearer ${token}` },
       });
       alert('Profile updated successfully');
@@ -163,6 +258,268 @@ function Profile() {
                   <p className="mt-2 text-xs text-gray-500">Email cannot be changed</p>
                 </div>
 
+                {/* Phone */}
+                <div>
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                    Phone Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    id="phone"
+                    required
+                    value={formData.phone}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                    placeholder="+1234567890"
+                  />
+                  <p className="mt-2 text-xs text-gray-500">Phone number is required</p>
+                </div>
+
+                {/* Date of Birth */}
+                <div>
+                  <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    name="dateOfBirth"
+                    id="dateOfBirth"
+                    value={formData.dateOfBirth}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                  />
+                </div>
+
+                {/* Address Section */}
+                <div className="bg-gradient-to-r from-green-50 to-teal-50 rounded-lg p-4 border border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Address Information</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="street" className="block text-sm font-medium text-gray-700 mb-1">
+                        Street Address
+                      </label>
+                      <input
+                        type="text"
+                        name="street"
+                        id="street"
+                        value={formData.street}
+                        onChange={handleChange}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                        placeholder="Enter street address"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                          City
+                        </label>
+                        <input
+                          type="text"
+                          name="city"
+                          id="city"
+                          value={formData.city}
+                          onChange={handleChange}
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                          placeholder="Enter city"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
+                          State/Province
+                        </label>
+                        <input
+                          type="text"
+                          name="state"
+                          id="state"
+                          value={formData.state}
+                          onChange={handleChange}
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                          placeholder="Enter state/province"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="zipCode" className="block text-sm font-medium text-gray-700 mb-1">
+                          ZIP/Postal Code
+                        </label>
+                        <input
+                          type="text"
+                          name="zipCode"
+                          id="zipCode"
+                          value={formData.zipCode}
+                          onChange={handleChange}
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                          placeholder="Enter ZIP/postal code"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1">
+                          Country
+                        </label>
+                        <input
+                          type="text"
+                          name="country"
+                          id="country"
+                          value={formData.country}
+                          onChange={handleChange}
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                          placeholder="Enter country"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Preferences Section */}
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4 border border-gray-200">
+                  <label htmlFor="preferences" className="block text-base font-semibold text-gray-800 mb-4">
+                    Your Preferences <span className="text-sm font-normal text-gray-500">(Select up to 3)</span>
+                  </label>
+                  
+                  {/* Selected Preferences Display */}
+                  {formData.preferences.length > 0 && (
+                    <div className="mb-4 p-3 bg-white rounded-lg border border-primary-200 shadow-sm">
+                      <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Selected ({formData.preferences.length}/3)</p>
+                      <div className="flex flex-wrap gap-2">
+                        {formData.preferences.map((pref) => (
+                          <span
+                            key={pref}
+                            className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-primary-600 text-white shadow-sm whitespace-nowrap"
+                          >
+                            <span className="max-w-[200px] truncate">{pref === 'Other' && otherPreference ? `Other: ${otherPreference}` : pref}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (pref === 'Other') {
+                                  setOtherPreference('');
+                                }
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  preferences: prev.preferences.filter((p) => p !== pref),
+                                }));
+                              }}
+                              className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-primary-700 focus:outline-none flex-shrink-0"
+                            >
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Preference Buttons Grid - Reduced list with better spacing */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-3">
+                    {genreOptions.map((category) => {
+                      const isSelected = formData.preferences.includes(category);
+                      return (
+                        <button
+                          key={category}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setFormData((prev) => ({
+                                ...prev,
+                                preferences: prev.preferences.filter((p) => p !== category),
+                              }));
+                            } else {
+                              if (formData.preferences.length < 3) {
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  preferences: [...prev.preferences, category],
+                                }));
+                              } else {
+                                alert('You can select a maximum of 3 preferences');
+                              }
+                            }
+                          }}
+                          className={`px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 whitespace-nowrap ${
+                            isSelected
+                              ? 'bg-primary-600 text-white shadow-md ring-2 ring-primary-300 hover:bg-primary-700'
+                              : 'bg-white text-gray-700 border-2 border-gray-300 hover:border-primary-400 hover:bg-primary-50 hover:text-primary-700 shadow-sm'
+                          }`}
+                        >
+                          {category}
+                        </button>
+                      );
+                    })}
+                    {/* Other option with text input */}
+                    <div className="relative col-span-full">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (formData.preferences.includes('Other')) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              preferences: prev.preferences.filter((p) => p !== 'Other'),
+                            }));
+                            setOtherPreference('');
+                          } else {
+                            if (formData.preferences.length < 3) {
+                              setFormData((prev) => ({
+                                ...prev,
+                                preferences: [...prev.preferences, 'Other'],
+                              }));
+                            } else {
+                              alert('You can select a maximum of 3 preferences');
+                            }
+                          }
+                        }}
+                        className={`w-full px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 ${
+                          formData.preferences.includes('Other')
+                            ? 'bg-primary-600 text-white shadow-md ring-2 ring-primary-300 hover:bg-primary-700'
+                            : 'bg-white text-gray-700 border-2 border-gray-300 hover:border-primary-400 hover:bg-primary-50 hover:text-primary-700 shadow-sm'
+                        }`}
+                      >
+                        Other
+                      </button>
+                      {formData.preferences.includes('Other') && (
+                        <input
+                          type="text"
+                          value={otherPreference}
+                          onChange={(e) => setOtherPreference(e.target.value)}
+                          placeholder="Enter your preference"
+                          className="mt-3 w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Status Messages */}
+                  <div className="mt-4 space-y-1.5">
+                    {formData.preferences.length === 0 && (
+                      <p className="text-sm text-gray-500 italic">
+                        👆 Select up to 3 preferences that interest you
+                      </p>
+                    )}
+                    {formData.preferences.length > 0 && formData.preferences.length < 3 && (
+                      <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                        <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <p className="text-sm text-green-700 font-medium">
+                          Great! You can select up to {3 - formData.preferences.length} more preference{3 - formData.preferences.length === 1 ? '' : 's'}
+                        </p>
+                      </div>
+                    )}
+                    {formData.preferences.length === 3 && (
+                      <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                        <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <p className="text-sm text-blue-700 font-medium">
+                          Perfect! You've selected all 3 preferences
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Role */}
                 <div>
                   <label htmlFor="role" className="block text-sm font-medium text-gray-700">
@@ -176,6 +533,7 @@ function Profile() {
                     value={formData.role}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-50 text-gray-500 sm:text-sm"
                   />
+                  <p className="mt-2 text-xs text-gray-500">Role cannot be changed</p>
                 </div>
 
                 {/* Member Info (if available) */}
@@ -254,3 +612,4 @@ function Profile() {
 }
 
 export default withAuth(Profile);
+

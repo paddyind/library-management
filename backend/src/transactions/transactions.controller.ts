@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, UseGuards, Req, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateTransactionDto } from '../dto/transaction.dto';
@@ -17,13 +17,14 @@ export class TransactionsController {
 
   @Get()
   @UseGuards(RolesGuard)
-  @Roles(MemberRole.ADMIN)
-  @ApiOperation({ summary: 'Get all transactions', description: 'Retrieve all transactions (Admin only)' })
+  @Roles(MemberRole.ADMIN, MemberRole.LIBRARIAN)
+  @ApiOperation({ summary: 'Get all transactions', description: 'Retrieve all transactions (Admin and Librarian only). Can filter by bookId query param.' })
   @ApiResponse({ status: 200, description: 'List of all transactions' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
-  findAll() {
-    return this.transactionsService.findAll();
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin or Librarian role required' })
+  findAll(@Req() req: Request) {
+    const bookId = req.query.bookId as string | undefined;
+    return this.transactionsService.findAll(bookId);
   }
 
   @Get('my-transactions')
@@ -36,12 +37,32 @@ export class TransactionsController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Create a new transaction', description: 'Create a new transaction (e.g., buy a book)' })
+  @ApiOperation({ summary: 'Create a new transaction', description: 'Create a new transaction (e.g., borrow a book)' })
   @ApiBody({ type: CreateTransactionDto })
   @ApiResponse({ status: 201, description: 'Transaction created successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   create(@Body() createTransactionDto: CreateTransactionDto, @Req() req: Request) {
     const member = req.user as Member;
     return this.transactionsService.create(createTransactionDto, member.id);
+  }
+
+  @Patch(':id/return')
+  @ApiOperation({ summary: 'Return a borrowed book', description: 'Mark a transaction as returned and update book status' })
+  @ApiResponse({ status: 200, description: 'Book returned successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Transaction not found' })
+  returnBook(@Param('id') transactionId: string, @Req() req: Request) {
+    const member = req.user as Member;
+    return this.transactionsService.return(transactionId, member.id);
+  }
+
+  @Patch(':id/renew')
+  @ApiOperation({ summary: 'Renew a borrowed book', description: 'Extend the due date for a borrowed book by 14 days' })
+  @ApiResponse({ status: 200, description: 'Book renewed successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Transaction not found' })
+  renewBook(@Param('id') transactionId: string, @Req() req: Request) {
+    const member = req.user as Member;
+    return this.transactionsService.renew(transactionId, member.id);
   }
 }

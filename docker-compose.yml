@@ -48,12 +48,14 @@ services:
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD}
-      - AUTH_STORAGE=${AUTH_STORAGE:-auto}
+      - AUTH_STORAGE=${AUTH_STORAGE:-supabase}
       # Proxy configuration for corporate networks (optional)
       - HTTP_PROXY=${HTTP_PROXY}
       - HTTPS_PROXY=${HTTPS_PROXY}
       - NO_PROXY=${NO_PROXY}
       - NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
+      # Bypass SSL verification for corporate networks (temporary fix)
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
     dns:
       - 8.8.8.8          # Google DNS (primary)
       - 8.8.4.4          # Google DNS (secondary)
