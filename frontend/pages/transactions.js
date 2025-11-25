@@ -28,8 +28,9 @@ function TransactionsPage() {
       );
       alert('Return request submitted! Awaiting approval.');
       // Refresh transactions
-      const url = user?.role?.toLowerCase() === 'admin' 
-        ? `${API_BASE_URL}/transactions` 
+      const isAdminOrLibrarian = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'librarian';
+      const url = isAdminOrLibrarian
+        ? `${API_BASE_URL}/transactions${bookId ? `?bookId=${bookId}` : ''}` 
         : `${API_BASE_URL}/transactions/my-transactions`;
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },
@@ -37,7 +38,13 @@ function TransactionsPage() {
       const allData = response.data || [];
       setAllTransactions(allData);
       if (statusFilter === 'all') {
-        setTransactions(allData.slice(0, 10));
+        // Sort: pending_return_approval first, then by date
+        const sorted = [...allData].sort((a, b) => {
+          if (a.status === 'pending_return_approval' && b.status !== 'pending_return_approval') return -1;
+          if (a.status !== 'pending_return_approval' && b.status === 'pending_return_approval') return 1;
+          return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        });
+        setTransactions(sorted.slice(0, 10));
       } else {
         setTransactions(allData.filter(t => t.status === statusFilter));
       }
@@ -57,8 +64,48 @@ function TransactionsPage() {
       );
       alert('Book renewed successfully!');
       // Refresh transactions
-      const url = user?.role?.toLowerCase() === 'admin' 
-        ? `${API_BASE_URL}/transactions` 
+      const isAdminOrLibrarian = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'librarian';
+      const url = isAdminOrLibrarian
+        ? `${API_BASE_URL}/transactions${bookId ? `?bookId=${bookId}` : ''}` 
+        : `${API_BASE_URL}/transactions/my-transactions`;
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const allData = response.data || [];
+      setAllTransactions(allData);
+      if (statusFilter === 'all') {
+        // Sort: pending_return_approval first, then by date
+        const sorted = [...allData].sort((a, b) => {
+          if (a.status === 'pending_return_approval' && b.status !== 'pending_return_approval') return -1;
+          if (a.status !== 'pending_return_approval' && b.status === 'pending_return_approval') return 1;
+          return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        });
+        setTransactions(sorted.slice(0, 10));
+      } else {
+        setTransactions(allData.filter(t => t.status === statusFilter));
+      }
+    } catch (err) {
+      console.error('Failed to renew book:', err);
+      alert(err.response?.data?.message || 'Failed to renew book');
+    }
+  };
+
+  const handleApproveReturn = async (transactionId) => {
+    if (!confirm('Approve this return request? The book will be marked as returned and available.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(
+        `${API_BASE_URL}/transactions/${transactionId}/approve-return`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert('Return approved successfully! Book is now available.');
+      // Refresh transactions
+      const url = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'librarian'
+        ? `${API_BASE_URL}/transactions${bookId ? `?bookId=${bookId}` : ''}` 
         : `${API_BASE_URL}/transactions/my-transactions`;
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },
@@ -71,8 +118,50 @@ function TransactionsPage() {
         setTransactions(allData.filter(t => t.status === statusFilter));
       }
     } catch (err) {
-      console.error('Failed to renew book:', err);
-      alert(err.response?.data?.message || 'Failed to renew book');
+      console.error('Failed to approve return:', err);
+      alert(err.response?.data?.message || 'Failed to approve return');
+    }
+  };
+
+  const handleRejectReturn = async (transactionId) => {
+    const reason = prompt('Enter reason for rejection (optional):');
+    if (reason === null) return; // User cancelled
+
+    if (!confirm('Reject this return request? The transaction will be set back to active.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(
+        `${API_BASE_URL}/transactions/${transactionId}/reject-return`,
+        { reason: reason || undefined },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert('Return rejected. Transaction set back to active.');
+      // Refresh transactions
+      const url = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'librarian'
+        ? `${API_BASE_URL}/transactions${bookId ? `?bookId=${bookId}` : ''}` 
+        : `${API_BASE_URL}/transactions/my-transactions`;
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const allData = response.data || [];
+      setAllTransactions(allData);
+      if (statusFilter === 'all') {
+        // Sort: pending_return_approval first, then by date
+        const sorted = [...allData].sort((a, b) => {
+          if (a.status === 'pending_return_approval' && b.status !== 'pending_return_approval') return -1;
+          if (a.status !== 'pending_return_approval' && b.status === 'pending_return_approval') return 1;
+          return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        });
+        setTransactions(sorted.slice(0, 10));
+      } else {
+        setTransactions(allData.filter(t => t.status === statusFilter));
+      }
+    } catch (err) {
+      console.error('Failed to reject return:', err);
+      alert(err.response?.data?.message || 'Failed to reject return');
     }
   };
 
@@ -114,8 +203,15 @@ function TransactionsPage() {
         
         setAllTransactions(allData);
         // Show recent 10 by default, or filter by status
+        // For admin/librarian, prioritize showing pending_return_approval transactions
         if (statusFilter === 'all') {
-          setTransactions(allData.slice(0, 10));
+          // Sort: pending_return_approval first, then by date (newest first)
+          const sorted = [...allData].sort((a, b) => {
+            if (a.status === 'pending_return_approval' && b.status !== 'pending_return_approval') return -1;
+            if (a.status !== 'pending_return_approval' && b.status === 'pending_return_approval') return 1;
+            return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+          });
+          setTransactions(sorted.slice(0, 10));
         } else {
           setTransactions(allData.filter(t => t.status === statusFilter));
         }
@@ -273,7 +369,8 @@ function TransactionsPage() {
                           </p>
                         </div>
                       </div>
-                          {(transaction.status === 'active' || transaction.status === 'pending_return_approval') && transaction.type === 'borrow' && isMember(user) && (
+                          {/* Action buttons for members (return/renew) */}
+                          {transaction.type === 'borrow' && isMember(user) && (
                             <div className="mt-2 flex justify-end space-x-4">
                               {transaction.status === 'active' && (
                                 <>
@@ -305,6 +402,24 @@ function TransactionsPage() {
                               {transaction.status === 'pending_return_approval' && (
                                 <span className="text-sm text-orange-600 font-medium">Return Pending Approval</span>
                               )}
+                            </div>
+                          )}
+                          
+                          {/* Action buttons for admin/librarian (approve/reject pending returns) */}
+                          {transaction.type === 'borrow' && transaction.status === 'pending_return_approval' && isAdminOrLibrarian(user) && (
+                            <div className="mt-2 flex justify-end space-x-4">
+                              <button
+                                onClick={() => handleApproveReturn(transaction.id)}
+                                className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors"
+                              >
+                                Approve Return
+                              </button>
+                              <button
+                                onClick={() => handleRejectReturn(transaction.id)}
+                                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+                              >
+                                Reject Return
+                              </button>
                             </div>
                           )}
                     </div>

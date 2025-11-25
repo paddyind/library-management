@@ -211,13 +211,51 @@ export class SupabaseService implements OnModuleInit {
     return this.supabase;
   }
 
+  /**
+   * Get an admin client that uses service role key to bypass RLS
+   * Use this for operations that need to bypass row-level security
+   */
+  getAdminClient(): SupabaseClient {
+    const supabaseUrl = this.configService.get<string>('NEXT_PUBLIC_SUPABASE_URL') || 
+                        this.configService.get<string>('SUPABASE_URL');
+    const serviceRoleKey = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !serviceRoleKey) {
+      // Fallback to regular client if service role key not available
+      console.warn('⚠️ Service role key not available, using regular client (may have RLS restrictions)');
+      return this.getClient();
+    }
+    
+    // Create a new client with service role key that bypasses RLS
+    // Use the same custom fetch from the main client if available
+    const customFetch = (this.supabase as any)?._global?.fetch;
+    
+    return createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+      global: {
+        fetch: customFetch || fetch,
+      },
+    });
+  }
+
   async onModuleInit() {
-    // Perform one-time health check at startup
+    // Perform one-time health check at startup (non-blocking)
     if (!this.isConfigured) {
       this.healthCheckCompleted = true;
       return;
     }
 
+    // Run health check asynchronously without blocking server startup
+    // This prevents connection resets if health check takes too long
+    this.performHealthCheck().catch((error) => {
+      console.error('❌ Health check failed in background:', error.message);
+    });
+  }
+
+  private async performHealthCheck() {
     console.log('🔍 Performing Supabase health check...');
     
     try {

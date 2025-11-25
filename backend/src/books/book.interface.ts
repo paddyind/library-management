@@ -14,9 +14,11 @@ export interface Book {
   isbn: string;
   owner_id: string;
   count: number;
-  status: BookStatus;
+  status: BookStatus | string; // Allow string for custom statuses like 'with_me'
   forSale: boolean;
   price?: number;
+  isAvailable?: boolean; // Optional: indicates if book is available for borrowing
+  borrowedByMe?: boolean; // Optional: indicates if current user has borrowed this book
   createdAt: Date;
   updatedAt: Date;
 }

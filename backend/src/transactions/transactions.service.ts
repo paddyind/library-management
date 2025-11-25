@@ -5,6 +5,9 @@ import { ConfigService } from '@nestjs/config';
 import { CreateTransactionDto } from '../dto/transaction.dto';
 import { Transaction, TransactionType } from './transaction.interface';
 import { subscriptionPlans } from '../config/subscription-plans';
+import { MembersService } from '../members/members.service';
+import { MemberRole } from '../members/member.interface';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class TransactionsService {
@@ -12,6 +15,7 @@ export class TransactionsService {
     private readonly supabaseService: SupabaseService,
     private readonly sqliteService: SqliteService,
     private readonly configService: ConfigService,
+    private readonly membersService: MembersService,
   ) {}
 
   private getPreferredStorage(): 'supabase' | 'sqlite' {
@@ -29,9 +33,14 @@ export class TransactionsService {
     return 'sqlite';
   }
 
-  async create(createTransactionDto: CreateTransactionDto, memberId: string): Promise<Transaction> {
+  async create(createTransactionDto: CreateTransactionDto, memberId: string, userData?: { email?: string; name?: string; role?: MemberRole }): Promise<Transaction> {
     const { bookId, type } = createTransactionDto;
     const storage = this.getPreferredStorage();
+    
+    // ALWAYS ensure user exists in SQLite before creating transaction (for fallback support)
+    // This prevents foreign key constraint errors when Supabase fails
+    // Also ensure user exists in Supabase users table
+    await this.ensureUserExistsInSqlite(memberId, userData);
     
     // Validate borrow requests BEFORE creating transaction
     if (type === 'borrow') {
@@ -44,6 +53,9 @@ export class TransactionsService {
     
     if (storage === 'supabase') {
       try {
+        // Ensure user exists in Supabase users table before creating transaction
+        await this.ensureUserExistsInSupabase(memberId, userData);
+        
         const transactionData: any = {
           bookId,
           memberId,
@@ -62,7 +74,7 @@ export class TransactionsService {
 
         if (error) {
           console.warn('⚠️ Supabase transaction creation error, falling back to SQLite:', error.message);
-          const sqliteTransaction = await this.createInSqlite(createTransactionDto, memberId);
+          const sqliteTransaction = await this.createInSqlite(createTransactionDto, memberId, userData);
           // Update book count for SQLite path too
           if (type === 'borrow') {
             try {
@@ -89,11 +101,11 @@ export class TransactionsService {
         return data;
       } catch (error: any) {
         console.warn('⚠️ Supabase connection error, falling back to SQLite:', error.message);
-        return await this.createInSqlite(createTransactionDto, memberId);
+        return await this.createInSqlite(createTransactionDto, memberId, userData);
       }
     }
     
-    const transaction = await this.createInSqlite(createTransactionDto, memberId);
+    const transaction = await this.createInSqlite(createTransactionDto, memberId, userData);
     
     // Update book count and status when borrowing (AFTER transaction is created successfully)
     if (type === 'borrow') {
@@ -110,10 +122,13 @@ export class TransactionsService {
     return transaction;
   }
 
-  private async createInSqlite(createTransactionDto: CreateTransactionDto, memberId: string): Promise<Transaction> {
+  private async createInSqlite(createTransactionDto: CreateTransactionDto, memberId: string, userData?: { email?: string; name?: string; role?: MemberRole }): Promise<Transaction> {
     if (!this.sqliteService.isReady()) {
       throw new Error('SQLite database is not available');
     }
+
+    // Ensure user exists in SQLite before creating transaction
+    await this.ensureUserExistsInSqlite(memberId, userData);
 
     const { bookId, type } = createTransactionDto;
     const db = this.sqliteService.getDatabase();
@@ -154,7 +169,248 @@ export class TransactionsService {
         updatedAt: new Date(transaction.updatedAt),
       };
     } catch (error: any) {
+      // Check if it's a foreign key constraint error
+      if (error.message?.includes('FOREIGN KEY') || error.message?.includes('constraint')) {
+        // User might not exist - try to ensure they exist and retry
+        console.warn('⚠️ Foreign key constraint error, ensuring user exists and retrying...');
+        
+        // Retry ensuring user exists with userData
+        await this.ensureUserExistsInSqlite(memberId, userData);
+        
+        try {
+          db.prepare(`
+            INSERT INTO transactions (id, bookId, memberId, type, status, borrowedDate, dueDate, createdAt, updatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            id,
+            bookId,
+            memberId,
+            type,
+            type === 'borrow' ? 'active' : 'completed',
+            type === 'borrow' ? now.toISOString() : null,
+            dueDate ? dueDate.toISOString() : null,
+            now.toISOString(),
+            now.toISOString()
+          );
+
+          const transaction = db.prepare('SELECT * FROM transactions WHERE id = ?').get(id) as any;
+          
+          return {
+            id: transaction.id,
+            bookId: transaction.bookId,
+            memberId: transaction.memberId,
+            type: transaction.type as TransactionType,
+            status: transaction.status,
+            borrowedDate: transaction.borrowedDate ? new Date(transaction.borrowedDate) : undefined,
+            dueDate: transaction.dueDate ? new Date(transaction.dueDate) : undefined,
+            returnDate: transaction.returnDate ? new Date(transaction.returnDate) : undefined,
+            createdAt: new Date(transaction.createdAt),
+            updatedAt: new Date(transaction.updatedAt),
+          };
+        } catch (retryError: any) {
+          throw new Error(`Failed to create transaction after ensuring user exists: ${retryError.message}`);
+        }
+      }
       throw new Error(`Failed to create transaction: ${error.message}`);
+    }
+  }
+
+  /**
+   * Ensures a user exists in both Supabase users table and SQLite before creating transactions
+   * This prevents foreign key constraint errors
+   */
+  private async ensureUserExistsInSqlite(memberId: string, userData?: { email?: string; name?: string; role?: MemberRole }): Promise<void> {
+    if (!this.sqliteService.isReady()) {
+      return; // Can't ensure if SQLite is not available
+    }
+
+    // Check if user already exists in SQLite
+    const sqliteUser = this.sqliteService.findUserById(memberId);
+    if (sqliteUser) {
+      return; // User exists, no need to create
+    }
+
+    console.warn(`⚠️ User ${memberId} not found in SQLite, creating...`);
+    
+    try {
+      // Try to get user from Supabase first
+      let user: { id: string; email: string; name: string; role: MemberRole } | null = null;
+      
+      if (this.supabaseService.isReady()) {
+        try {
+          // Use admin client to bypass RLS when querying
+          const adminClient = this.supabaseService.getAdminClient();
+          const { data, error } = await adminClient
+            .from('users')
+            .select('id, email, name, role')
+            .eq('id', memberId)
+            .maybeSingle();
+          
+          if (!error && data) {
+            user = {
+              id: data.id,
+              email: data.email,
+              name: data.name,
+              role: (data.role as MemberRole) || MemberRole.MEMBER,
+            };
+            console.log(`✅ Found user in Supabase users table`);
+          } else if (error && error.code !== 'PGRST116') {
+            console.warn(`⚠️ Error querying Supabase for user:`, error.message);
+          }
+        } catch (supabaseError: any) {
+          console.warn(`⚠️ Supabase query failed:`, supabaseError.message);
+        }
+      }
+      
+      // If not found in Supabase, try to get from MembersService (might sync)
+      if (!user) {
+        try {
+          const member = await this.membersService.findOne(memberId);
+          user = {
+            id: member.id,
+            email: member.email,
+            name: member.name,
+            role: member.role,
+          };
+          console.log(`✅ Found user via MembersService`);
+        } catch (membersError: any) {
+          // User not found in MembersService either - use provided data or create basic user
+          console.warn(`⚠️ User not found in MembersService, using provided data or creating basic user`);
+        }
+      }
+      
+      // Use provided userData as fallback, or create minimal user
+      const email = user?.email || userData?.email || `user-${memberId.substring(0, 8)}@example.com`;
+      const name = user?.name || userData?.name || 'User';
+      const role = user?.role || userData?.role || MemberRole.MEMBER;
+      
+      // Create user in SQLite
+      const db = (this.sqliteService as any).db;
+      if (db) {
+        const hashedPassword = bcrypt.hashSync('SYNCED_USER', 10);
+        const now = new Date().toISOString();
+        
+        const stmt = db.prepare(`
+          INSERT INTO users (id, email, password, name, role, createdAt, updatedAt)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        
+        stmt.run(
+          memberId,
+          email,
+          hashedPassword,
+          name,
+          role,
+          now,
+          now
+        );
+        console.log(`✅ Created user ${memberId} in SQLite: ${email}`);
+      }
+      
+      // Also ensure user exists in Supabase users table if Supabase is available
+      if (this.supabaseService.isReady() && !user) {
+        try {
+          // Use admin client to bypass RLS
+          const adminClient = this.supabaseService.getAdminClient();
+          const { error: insertError } = await adminClient
+            .from('users')
+            .insert({
+              id: memberId,
+              email,
+              name,
+              role,
+            });
+          
+          if (!insertError) {
+            console.log(`✅ Created user ${memberId} in Supabase users table`);
+          } else if (insertError.code !== '23505') { // Ignore duplicate key errors
+            console.warn(`⚠️ Could not create user in Supabase users table:`, insertError.message);
+          }
+        } catch (supabaseInsertError: any) {
+          console.warn(`⚠️ Supabase insert failed:`, supabaseInsertError.message);
+        }
+      }
+    } catch (error: any) {
+      if (error.message?.includes('UNIQUE constraint') || error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        // User was created by another request, that's fine
+        console.log(`✅ User ${memberId} already exists in SQLite`);
+      } else {
+        console.error(`❌ Failed to ensure user ${memberId} exists:`, error.message);
+        // Don't throw - we'll try to create the user again if transaction fails
+      }
+    }
+  }
+
+  /**
+   * Ensures a user exists in Supabase users table before creating transactions
+   * This prevents foreign key constraint errors in Supabase
+   */
+  private async ensureUserExistsInSupabase(memberId: string, userData?: { email?: string; name?: string; role?: MemberRole }): Promise<void> {
+    if (!this.supabaseService.isReady()) {
+      return; // Can't ensure if Supabase is not available
+    }
+
+    try {
+      // Use admin client to bypass RLS for checking and creating users
+      const adminClient = this.supabaseService.getAdminClient();
+      
+      // Check if user exists in Supabase users table
+      const { data: existingUser, error: queryError } = await adminClient
+        .from('users')
+        .select('id')
+        .eq('id', memberId)
+        .maybeSingle();
+      
+      if (existingUser) {
+        return; // User exists, no need to create
+      }
+      
+      if (queryError && queryError.code !== 'PGRST116') {
+        console.warn(`⚠️ Error checking Supabase user:`, queryError.message);
+      }
+      
+      // User doesn't exist - try to get user data
+      let email = userData?.email;
+      let name = userData?.name;
+      let role = userData?.role || MemberRole.MEMBER;
+      
+      // Try to get from MembersService if data not provided
+      if (!email || !name) {
+        try {
+          const member = await this.membersService.findOne(memberId);
+          email = member.email;
+          name = member.name;
+          role = member.role;
+        } catch (membersError: any) {
+          // Use fallback values
+          email = email || `user-${memberId.substring(0, 8)}@example.com`;
+          name = name || 'User';
+          console.warn(`⚠️ Could not get user data from MembersService, using fallback values`);
+        }
+      }
+      
+      // Create user in Supabase users table using admin client (bypasses RLS)
+      // adminClient is already defined above
+      const { error: insertError } = await adminClient
+        .from('users')
+        .insert({
+          id: memberId,
+          email,
+          name,
+          role,
+        });
+      
+      if (!insertError) {
+        console.log(`✅ Created user ${memberId} in Supabase users table: ${email}`);
+      } else if (insertError.code === '23505') {
+        // Duplicate key - user was created by another request
+        console.log(`✅ User ${memberId} already exists in Supabase users table`);
+      } else {
+        console.warn(`⚠️ Could not create user in Supabase users table:`, insertError.message);
+      }
+    } catch (error: any) {
+      console.warn(`⚠️ Failed to ensure user exists in Supabase:`, error.message);
+      // Don't throw - we'll fall back to SQLite
     }
   }
 
@@ -165,8 +421,9 @@ export class TransactionsService {
       try {
         // Query transactions table (not loans table)
         // For admin/librarian, return ALL transactions across all users
-        let query = this.supabaseService
-          .getClient()
+        // Use admin client to bypass RLS and see all transactions
+        const adminClient = this.supabaseService.getAdminClient();
+        let query = adminClient
           .from('transactions')
           .select(`
             *,
@@ -189,7 +446,7 @@ export class TransactionsService {
 
         // Filter out any transactions with null books (orphaned), but keep all member transactions
         const validTransactions = (transactions || []).filter(t => t.book !== null);
-        console.log(`✅ Found ${validTransactions.length} transactions for admin/librarian view`);
+        console.log(`✅ Found ${validTransactions.length} transactions for admin/librarian view (including ${validTransactions.filter(t => t.status === 'pending_return_approval').length} pending approvals)`);
         return validTransactions;
       } catch (error: any) {
         console.warn('⚠️ Supabase connection error, falling back to SQLite:', error.message);
@@ -345,7 +602,8 @@ export class TransactionsService {
     if (storage === 'supabase') {
       let transaction: any = null; // Declare outside try block so it's accessible in catch
       try {
-        // First verify the transaction belongs to the member - check both active and pending_return_approval
+        // First verify the transaction belongs to the member - only check active status
+        // If it's already pending_return_approval, we should not allow another return request
         const { data: fetchedTransaction, error: fetchError } = await this.supabaseService
           .getClient()
           .from('transactions')
@@ -353,7 +611,7 @@ export class TransactionsService {
           .eq('id', transactionId)
           .eq('memberId', memberId)
           .eq('type', 'borrow')
-          .in('status', ['active', 'pending_return_approval'])
+          .eq('status', 'active')  // Only allow return for active transactions
           .single();
 
         if (fetchError || !fetchedTransaction) {
@@ -365,28 +623,30 @@ export class TransactionsService {
             .eq('id', transactionId)
             .eq('memberId', memberId)
             .eq('type', 'borrow')
-            .single();
+            .maybeSingle();
           
           if (existing) {
-            throw new Error(`Transaction already ${existing.status === 'pending_return_approval' ? 'pending return approval' : 'completed'}`);
+            if (existing.status === 'pending_return_approval') {
+              throw new Error('Return request already submitted and pending approval');
+            } else if (existing.status === 'completed') {
+              throw new Error('Transaction already completed');
+            } else {
+              throw new Error(`Transaction status is ${existing.status}, cannot return`);
+            }
           } else {
             throw new Error('Transaction not found');
           }
         }
         
         transaction = fetchedTransaction; // Store for use in catch block
-        
-        // If already pending return approval, just return it without updating
-        if (transaction.status === 'pending_return_approval') {
-          return transaction;
-        }
 
         // Update transaction to pending return approval (requires librarian/admin approval)
+        // Use admin client to bypass RLS for updates
         // No timeout - wait as long as needed (VPN/proxy can be extremely slow)
         console.log(`🔄 Updating transaction ${transactionId} to pending_return_approval...`);
         
-        const { data: updated, error: updateError } = await this.supabaseService
-          .getClient()
+        const adminClient = this.supabaseService.getAdminClient();
+        const { data: updated, error: updateError } = await adminClient
           .from('transactions')
           .update({
             status: 'pending_return_approval',
@@ -395,11 +655,36 @@ export class TransactionsService {
           })
           .eq('id', transactionId)
           .select()
-          .single();
+          .maybeSingle(); // Use maybeSingle() to handle cases where no rows are returned
 
         if (updateError) {
           console.error(`❌ Failed to update transaction ${transactionId}:`, updateError.message);
           throw new Error(`Failed to return book: ${updateError.message}`);
+        }
+        
+        if (!updated) {
+          // Transaction might have been updated by another request, fetch it using admin client
+          const { data: fetched, error: fetchError } = await adminClient
+            .from('transactions')
+            .select('*')
+            .eq('id', transactionId)
+            .maybeSingle();
+          
+          if (fetchError || !fetched) {
+            throw new Error(`Transaction ${transactionId} not found after update`);
+          }
+          
+          console.log(`✅ Transaction ${transactionId} updated successfully (fetched after update)`);
+          
+          // Update book count when returning (even if pending approval)
+          try {
+            await this.updateBookAvailabilityOnReturn(transaction.bookId, storage);
+          } catch (updateError: any) {
+            console.warn('⚠️ Failed to update book availability on return, but transaction was updated:', updateError.message);
+            // Don't fail the return if book update fails
+          }
+          
+          return fetched;
         }
         
         console.log(`✅ Transaction ${transactionId} updated successfully`);
@@ -987,5 +1272,211 @@ export class TransactionsService {
         console.warn('⚠️ Failed to update book availability on return:', error.message);
       }
     }
+  }
+
+  /**
+   * Approve a pending return request (Admin/Librarian only)
+   * Changes status from pending_return_approval to completed
+   */
+  async approveReturn(transactionId: string, approverId: string): Promise<Transaction> {
+    const storage = this.getPreferredStorage();
+    const now = new Date();
+
+    if (storage === 'supabase') {
+      try {
+        // Verify transaction exists and is pending return approval
+        const { data: transaction, error: fetchError } = await this.supabaseService
+          .getAdminClient()
+          .from('transactions')
+          .select('*')
+          .eq('id', transactionId)
+          .eq('status', 'pending_return_approval')
+          .eq('type', 'borrow')
+          .maybeSingle();
+
+        if (fetchError || !transaction) {
+          throw new Error('Transaction not found or not pending return approval');
+        }
+
+        // Update transaction to completed
+        const { data: updated, error: updateError } = await this.supabaseService
+          .getAdminClient()
+          .from('transactions')
+          .update({
+            status: 'completed',
+            returnDate: now.toISOString(),
+            updatedAt: now.toISOString(),
+          })
+          .eq('id', transactionId)
+          .select()
+          .maybeSingle();
+
+        if (updateError || !updated) {
+          throw new Error(`Failed to approve return: ${updateError?.message || 'Update failed'}`);
+        }
+
+        // Update book availability (increase count)
+        try {
+          await this.updateBookAvailabilityOnReturn(transaction.bookId, storage);
+        } catch (updateError: any) {
+          console.warn('⚠️ Failed to update book availability on approval, but transaction was updated:', updateError.message);
+        }
+
+        console.log(`✅ Return approved for transaction ${transactionId} by ${approverId}`);
+        return updated;
+      } catch (error: any) {
+        console.error('❌ Failed to approve return:', error.message);
+        throw error;
+      }
+    }
+
+    // SQLite fallback
+    return this.approveReturnInSqlite(transactionId, approverId);
+  }
+
+  private approveReturnInSqlite(transactionId: string, approverId: string): Transaction {
+    if (!this.sqliteService.isReady()) {
+      throw new Error('SQLite database is not available');
+    }
+
+    const db = this.sqliteService.getDatabase();
+    const now = new Date();
+
+    // Verify transaction exists and is pending return approval
+    const transaction = db.prepare(`
+      SELECT * FROM transactions 
+      WHERE id = ? AND status = 'pending_return_approval' AND type = 'borrow'
+    `).get(transactionId) as any;
+
+    if (!transaction) {
+      throw new Error('Transaction not found or not pending return approval');
+    }
+
+    // Update transaction to completed
+    db.prepare(`
+      UPDATE transactions 
+      SET status = 'completed', returnDate = ?, updatedAt = ?
+      WHERE id = ?
+    `).run(now.toISOString(), now.toISOString(), transactionId);
+
+    // Update book availability
+    try {
+      this.updateBookAvailabilityOnReturn(transaction.bookId, 'sqlite');
+    } catch (updateError: any) {
+      console.warn('⚠️ Failed to update book availability on approval:', updateError.message);
+    }
+
+    // Fetch updated transaction
+    const updated = db.prepare('SELECT * FROM transactions WHERE id = ?').get(transactionId) as any;
+    
+    return {
+      id: updated.id,
+      bookId: updated.bookId,
+      memberId: updated.memberId,
+      type: updated.type as TransactionType,
+      status: updated.status,
+      borrowedDate: updated.borrowedDate ? new Date(updated.borrowedDate) : undefined,
+      dueDate: updated.dueDate ? new Date(updated.dueDate) : undefined,
+      returnDate: updated.returnDate ? new Date(updated.returnDate) : undefined,
+      createdAt: new Date(updated.createdAt),
+      updatedAt: new Date(updated.updatedAt),
+    };
+  }
+
+  /**
+   * Reject a pending return request (Admin/Librarian only)
+   * Changes status from pending_return_approval back to active
+   */
+  async rejectReturn(transactionId: string, approverId: string, reason?: string): Promise<Transaction> {
+    const storage = this.getPreferredStorage();
+    const now = new Date();
+
+    if (storage === 'supabase') {
+      try {
+        // Verify transaction exists and is pending return approval
+        const { data: transaction, error: fetchError } = await this.supabaseService
+          .getAdminClient()
+          .from('transactions')
+          .select('*')
+          .eq('id', transactionId)
+          .eq('status', 'pending_return_approval')
+          .eq('type', 'borrow')
+          .maybeSingle();
+
+        if (fetchError || !transaction) {
+          throw new Error('Transaction not found or not pending return approval');
+        }
+
+        // Update transaction back to active
+        const { data: updated, error: updateError } = await this.supabaseService
+          .getAdminClient()
+          .from('transactions')
+          .update({
+            status: 'active',
+            returnDate: null, // Clear return date
+            updatedAt: now.toISOString(),
+          })
+          .eq('id', transactionId)
+          .select()
+          .maybeSingle();
+
+        if (updateError || !updated) {
+          throw new Error(`Failed to reject return: ${updateError?.message || 'Update failed'}`);
+        }
+
+        console.log(`✅ Return rejected for transaction ${transactionId} by ${approverId}${reason ? ` (Reason: ${reason})` : ''}`);
+        return updated;
+      } catch (error: any) {
+        console.error('❌ Failed to reject return:', error.message);
+        throw error;
+      }
+    }
+
+    // SQLite fallback
+    return this.rejectReturnInSqlite(transactionId, approverId, reason);
+  }
+
+  private rejectReturnInSqlite(transactionId: string, approverId: string, reason?: string): Transaction {
+    if (!this.sqliteService.isReady()) {
+      throw new Error('SQLite database is not available');
+    }
+
+    const db = this.sqliteService.getDatabase();
+    const now = new Date();
+
+    // Verify transaction exists and is pending return approval
+    const transaction = db.prepare(`
+      SELECT * FROM transactions 
+      WHERE id = ? AND status = 'pending_return_approval' AND type = 'borrow'
+    `).get(transactionId) as any;
+
+    if (!transaction) {
+      throw new Error('Transaction not found or not pending return approval');
+    }
+
+    // Update transaction back to active
+    db.prepare(`
+      UPDATE transactions 
+      SET status = 'active', returnDate = NULL, updatedAt = ?
+      WHERE id = ?
+    `).run(now.toISOString(), transactionId);
+
+    // Fetch updated transaction
+    const updated = db.prepare('SELECT * FROM transactions WHERE id = ?').get(transactionId) as any;
+    
+    console.log(`✅ Return rejected for transaction ${transactionId} by ${approverId}${reason ? ` (Reason: ${reason})` : ''}`);
+    
+    return {
+      id: updated.id,
+      bookId: updated.bookId,
+      memberId: updated.memberId,
+      type: updated.type as TransactionType,
+      status: updated.status,
+      borrowedDate: updated.borrowedDate ? new Date(updated.borrowedDate) : undefined,
+      dueDate: updated.dueDate ? new Date(updated.dueDate) : undefined,
+      returnDate: updated.returnDate ? new Date(updated.returnDate) : undefined,
+      createdAt: new Date(updated.createdAt),
+      updatedAt: new Date(updated.updatedAt),
+    };
   }
 }

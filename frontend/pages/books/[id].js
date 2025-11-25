@@ -238,11 +238,17 @@ function BookDetailsPage() {
                 <div className="flex items-center gap-4 mb-4">
                   <span className="text-sm text-gray-500">ISBN: {book.isbn || 'N/A'}</span>
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    (book.status === 'available' || book.isAvailable) 
+                    book.borrowedByMe || book.status === 'with_me'
+                      ? 'bg-blue-100 text-blue-800'
+                      : (book.status === 'available' || book.isAvailable) 
                       ? 'bg-green-100 text-green-800' 
                       : 'bg-red-100 text-red-800'
                   }`}>
-                    {(book.status === 'available' || book.isAvailable) ? 'Available' : 'Out of Stock'}
+                    {book.borrowedByMe || book.status === 'with_me' 
+                      ? 'With me' 
+                      : (book.status === 'available' || book.isAvailable) 
+                      ? 'Available' 
+                      : 'Out of Stock'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 mb-6">
@@ -257,11 +263,11 @@ function BookDetailsPage() {
                 {user && isMember(user) && (
                   <button
                     onClick={handleBorrow}
-                    disabled={borrowing || !(book.status === 'available' || book.isAvailable || book.status?.toLowerCase() === 'available')}
+                    disabled={borrowing || book.borrowedByMe || book.status === 'with_me' || !(book.status === 'available' || book.isAvailable || book.status?.toLowerCase() === 'available')}
                     className={`font-semibold py-3 px-6 rounded-lg transition-colors duration-200 ${
                       borrowing
                         ? 'bg-indigo-400 text-white cursor-wait'
-                        : !(book.status === 'available' || book.isAvailable || book.status?.toLowerCase() === 'available')
+                        : book.borrowedByMe || book.status === 'with_me' || !(book.status === 'available' || book.isAvailable || book.status?.toLowerCase() === 'available')
                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                     }`}

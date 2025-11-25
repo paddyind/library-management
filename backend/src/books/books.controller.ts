@@ -36,8 +36,10 @@ export class BooksController {
   @ApiOperation({ summary: 'Get book by ID', description: 'Retrieve a single book by its ID (public access)' })
   @ApiResponse({ status: 200, description: 'Book found' })
   @ApiResponse({ status: 404, description: 'Book not found' })
-  findOne(@Param('id') id: string): Promise<Book> {
-    return this.booksService.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: Request): Promise<Book> {
+    // Get userId from request if authenticated (optional)
+    const userId = (req as any).user?.id;
+    return this.booksService.findOne(id, userId);
   }
 
   @Post()

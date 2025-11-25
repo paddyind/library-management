@@ -128,21 +128,49 @@ export class AuthService {
     if (syncToBoth && primaryResult) {
       try {
         if (primaryStorage === 'supabase' && sqliteAvailable) {
-          // Also create in SQLite
+          // Also create in SQLite with Supabase ID
           try {
-            const existingUser = this.sqliteService.findUserByEmail(email);
+            const existingUser = this.sqliteService.findUserById(primaryResult.id);
             if (!existingUser) {
-              this.sqliteService.createUser({
-                email,
-                password, // Same password - will be hashed
-                name: primaryResult.name,
-                role: primaryResult.role,
-                phone: phone || '',
-                dateOfBirth: dateOfBirth || '',
-                address: address || '',
-                preferences: preferences || '',
-              });
-              console.log('✅ User also created in SQLite for sync');
+              // Check if user exists by email (might have different ID)
+              const existingByEmail = this.sqliteService.findUserByEmail(email);
+              if (existingByEmail) {
+                // Update existing user's ID to match Supabase ID
+                const db = (this.sqliteService as any).db;
+                if (db) {
+                  const stmt = db.prepare('UPDATE users SET id = ? WHERE email = ?');
+                  stmt.run(primaryResult.id, email);
+                  console.log('✅ Updated SQLite user ID to match Supabase');
+                }
+              } else {
+                // Create new user in SQLite with Supabase ID
+                const db = (this.sqliteService as any).db;
+                if (db) {
+                  const bcrypt = require('bcrypt');
+                  const hashedPassword = bcrypt.hashSync(password, 10);
+                  const now = new Date().toISOString();
+                  
+                  const stmt = db.prepare(`
+                    INSERT INTO users (id, email, password, name, role, phone, dateOfBirth, address, preferences, createdAt, updatedAt)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  `);
+                  
+                  stmt.run(
+                    primaryResult.id,
+                    email,
+                    hashedPassword,
+                    primaryResult.name,
+                    primaryResult.role,
+                    phone || '',
+                    dateOfBirth || '',
+                    address || '',
+                    preferences || '',
+                    now,
+                    now
+                  );
+                  console.log('✅ User synced to SQLite with Supabase ID');
+                }
+              }
             }
           } catch (err: any) {
             console.warn('⚠️ Could not sync user to SQLite:', err.message);
@@ -249,6 +277,7 @@ export class AuthService {
 
     // Try Supabase first if preferred (health check passed at startup)
     if (storage === 'supabase') {
+      let authData: any = null;
       try {
         const { data, error } = await this.supabaseService.getClient().auth.signInWithPassword({
           email,
@@ -260,34 +289,119 @@ export class AuthService {
           return this.sqliteSignIn(email, password);
         }
 
+        authData = data;
         console.log('✅ Supabase authentication successful for:', email);
         
         // Fetch full user profile from users table to get complete user data
         let fullUserProfile: any = null;
+        const authUser = data.user as any;
+        const userId = authUser?.id || '';
+        
         try {
           const { data: profileData, error: profileError } = await this.supabaseService
             .getClient()
             .from('users')
-            .select('id, email, name, role')
-            .eq('email', email)
+            .select('id, email, name, role, phone, dateOfBirth, address, preferences')
+            .eq('id', userId)
             .maybeSingle();
           
           if (!profileError && profileData) {
             fullUserProfile = profileData;
             console.log('✅ Fetched full user profile:', profileData.email, profileData.name);
           } else {
-            console.warn('⚠️ Could not fetch user profile, using auth metadata:', profileError?.message);
+            // User doesn't exist in users table - create them
+            console.warn('⚠️ User not found in users table, creating profile...');
+            try {
+              const { data: newProfile, error: insertError } = await this.supabaseService
+                .getClient()
+                .from('users')
+                .insert({
+                  id: userId,
+                  email: authUser?.email || email,
+                  name: authUser?.user_metadata?.name || email.split('@')[0],
+                  role: MemberRole.MEMBER,
+                  phone: null,
+                  dateOfBirth: null,
+                  address: null,
+                  preferences: null,
+                })
+                .select()
+                .single();
+              
+              if (!insertError && newProfile) {
+                fullUserProfile = newProfile;
+                console.log('✅ Created user profile in users table');
+              } else {
+                console.warn('⚠️ Could not create user profile:', insertError?.message);
+              }
+            } catch (createError: any) {
+              console.warn('⚠️ Error creating user profile:', createError.message);
+            }
           }
         } catch (error: any) {
           console.warn('⚠️ Error fetching user profile:', error.message);
         }
         
         // Use profile data if available, otherwise fallback to auth metadata
-        const authUser = data.user as any;
-        const userId = fullUserProfile?.id || authUser?.id || '';
         const userEmail = fullUserProfile?.email || authUser?.email || email;
         const userName = fullUserProfile?.name || authUser?.user_metadata?.name || email.split('@')[0];
         const userRole = fullUserProfile?.role || MemberRole.MEMBER;
+        
+        // ALWAYS sync user to SQLite if available (for fallback support)
+        // This ensures SQLite has the user even if Supabase connection fails later
+        if (this.sqliteService.isReady() && userId) {
+          try {
+            const existingUser = this.sqliteService.findUserById(userId);
+            if (!existingUser) {
+              // Check if user exists by email (might have different ID)
+              const existingByEmail = this.sqliteService.findUserByEmail(userEmail);
+              if (existingByEmail) {
+                // Update existing user's ID to match Supabase ID
+                const db = (this.sqliteService as any).db;
+                if (db) {
+                  const stmt = db.prepare('UPDATE users SET id = ? WHERE email = ?');
+                  stmt.run(userId, userEmail);
+                  console.log('✅ Updated SQLite user ID to match Supabase');
+                }
+              } else {
+                // Create new user in SQLite with Supabase ID
+                const db = (this.sqliteService as any).db;
+                if (db) {
+                  const bcrypt = require('bcrypt');
+                  const hashedPassword = bcrypt.hashSync('SUPABASE_USER', 10); // Placeholder password
+                  const now = new Date().toISOString();
+                  
+                  const stmt = db.prepare(`
+                    INSERT INTO users (id, email, password, name, role, phone, dateOfBirth, address, preferences, createdAt, updatedAt)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  `);
+                  
+                  stmt.run(
+                    userId,
+                    userEmail,
+                    hashedPassword,
+                    userName,
+                    userRole,
+                    fullUserProfile?.phone || '',
+                    fullUserProfile?.dateOfBirth || '',
+                    fullUserProfile?.address || '',
+                    fullUserProfile?.preferences || '',
+                    now,
+                    now
+                  );
+                  console.log('✅ User synced to SQLite for fallback support');
+                }
+              }
+            } else {
+              console.log('✅ User already exists in SQLite');
+            }
+          } catch (syncError: any) {
+            console.warn('⚠️ Could not sync user to SQLite:', syncError.message);
+            // Don't fail login if SQLite sync fails, but log the warning
+          }
+        } else if (!this.sqliteService.isReady()) {
+          console.warn('⚠️ SQLite not available - user will not be synced for fallback');
+        }
         
         // Normalize role
         const roleLower = userRole?.toLowerCase();
@@ -327,6 +441,44 @@ export class AuthService {
         } else {
           console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
         }
+        
+        // Before falling back, try to sync any existing Supabase user to SQLite if we have their ID
+        // This handles cases where user authenticated with Supabase but connection failed during profile fetch
+        if (authData?.user?.id && this.sqliteService.isReady()) {
+          try {
+            const existingUser = this.sqliteService.findUserById(authData.user.id);
+            if (!existingUser) {
+              const existingByEmail = this.sqliteService.findUserByEmail(email);
+              if (!existingByEmail) {
+                const db = (this.sqliteService as any).db;
+                if (db) {
+                  const bcrypt = require('bcrypt');
+                  const hashedPassword = bcrypt.hashSync('SUPABASE_USER', 10);
+                  const now = new Date().toISOString();
+                  
+                  const stmt = db.prepare(`
+                    INSERT INTO users (id, email, password, name, role, createdAt, updatedAt)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                  `);
+                  
+                  stmt.run(
+                    authData.user.id,
+                    email,
+                    hashedPassword,
+                    authData.user.user_metadata?.name || email.split('@')[0],
+                    MemberRole.MEMBER,
+                    now,
+                    now
+                  );
+                  console.log('✅ Synced Supabase user to SQLite before fallback');
+                }
+              }
+            }
+          } catch (syncError: any) {
+            console.warn('⚠️ Could not sync Supabase user to SQLite before fallback:', syncError.message);
+          }
+        }
+        
         return this.sqliteSignIn(email, password);
       }
     }

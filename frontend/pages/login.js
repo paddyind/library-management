@@ -18,6 +18,12 @@ export default function Login() {
     if (router.query.registered === 'true') {
       setSuccess('Registration successful! Please sign in with your credentials.');
     }
+    
+    // Check if redirected with profile missing error
+    if (router.query.error === 'PROFILE_MISSING') {
+      const message = router.query.message || 'Your account profile is missing. Please contact support or try logging in again.';
+      setError(message);
+    }
   }, [router.query]);
 
   const handleSubmit = async (e) => {
@@ -30,7 +36,14 @@ export default function Login() {
       await login(email, password);
       router.push('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to login');
+      // Check if it's a profile missing error
+      const errorCode = err.response?.data?.code;
+      if (errorCode === 'PROFILE_MISSING') {
+        setError('Your account profile is missing. Please contact support or try logging in again.');
+      } else {
+        // Regular login error (invalid credentials)
+        setError(err.response?.data?.message || err.message || 'Invalid email or password. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

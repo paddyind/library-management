@@ -403,7 +403,9 @@ docker compose restart backend
    - Check Supabase status: https://status.supabase.com/
 
 2. **Verify Transaction Status Constraint**: Missing `pending_return_approval` status
-   - Apply migration 005_fix_transaction_status.sql (included in combined migration)
+   - Apply migration `data/migrations/supabase/005_fix_transaction_status.sql`:
+     - Go to Supabase Dashboard → SQL Editor
+     - Copy SQL from the file and run it
    - The backend already has increased timeouts (30s for updates, 20s for verification)
 
 3. **Use SQLite Temporarily**:
@@ -420,12 +422,16 @@ docker compose restart backend
 
 ## 📝 Notes
 
+- **Migration Location**: All migrations are in `data/migrations/` (root level)
+  - Supabase: `data/migrations/supabase/`
+  - SQLite: `data/migrations/sqlite/`
 - **Demo users** are marked with `is_demo = true` (Supabase) or `is_demo = 1` (SQLite)
 - **Backups exclude demo users** - they can be recreated via seeding
-- **Migrations are idempotent** - safe to run multiple times
+- **Migrations are idempotent** - safe to run multiple times (use `IF NOT EXISTS` or `DO $$` blocks)
 - **Service role key** bypasses RLS - required for backend operations
 - **RLS policies** are included in the main migration (no manual patching needed)
 - **Triggers and policies** use `DROP IF EXISTS` before `CREATE` (idempotent)
+- **Applying Individual Migrations**: For Supabase, apply via Dashboard SQL Editor (see manual approach above)
 
 ---
 

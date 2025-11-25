@@ -27,13 +27,21 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ? exception.getResponse()
         : 'Internal server error';
 
-    const errorResponse = {
+    const messageText = typeof message === 'string' ? message : (message as any).message || 'An error occurred';
+    const errorCode = (exception as any).code || (message as any)?.code;
+
+    const errorResponse: any = {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
       method: request.method,
-      message: typeof message === 'string' ? message : (message as any).message || 'An error occurred',
+      message: messageText,
     };
+
+    // Include error code if present (for frontend to distinguish error types)
+    if (errorCode) {
+      errorResponse.code = errorCode;
+    }
 
     // Log the error
     this.logger.error(

@@ -12,19 +12,43 @@ Both use the same logical schema, adapted for their respective SQL dialects.
 
 ## 🗂️ Schema Version
 
-**Current Version**: `1.0.2`  
-**Latest Migration**: `005_fix_transaction_status.sql`
-**Migration Files**:
-- `migrations/supabase/001_initial_schema.sql` - Initial schema
-- `migrations/supabase/002_add_is_demo_flag.sql` - Demo user flag
-- `migrations/supabase/003_add_user_fields.sql` - Phone, DOB, address, preferences
-- `migrations/supabase/004_add_book_count.sql` - Book count column
-- `migrations/supabase/004_add_reviews_ratings.sql` - Reviews and ratings tables
-- `migrations/supabase/005_fix_transaction_status.sql` - Fix transaction status constraint
-- `migrations/sqlite/001_initial_schema.sql` - Initial schema
-- `migrations/sqlite/002_add_is_demo_flag.sql` - Demo user flag
-- `migrations/sqlite/003_add_user_fields.sql` - Phone, DOB, address, preferences
-- `migrations/sqlite/004_add_reviews_ratings.sql` - Reviews and ratings tables
+**Current Version**: `1.0.3`  
+**Latest Migration**: `005_fix_transaction_status.sql`  
+**Migration Location**: `data/migrations/` (root level)
+
+### Migration Files Structure
+
+**Supabase Migrations** (`data/migrations/supabase/`):
+- `001_initial_schema.sql` - Initial schema with all core tables
+- `002_add_is_demo_flag.sql` - Demo user flag for backup exclusion
+- `003_add_user_fields.sql` - Phone, DOB, address, preferences (JSONB for Supabase, TIMESTAMPTZ for dates)
+- `004_add_book_count.sql` - Book count column
+- `004_add_reviews_ratings.sql` - Reviews and ratings tables
+- `005_fix_transaction_status.sql` - Fix transaction status constraint (adds pending_return_approval)
+
+**SQLite Migrations** (`data/migrations/sqlite/`):
+- `001_initial_schema.sql` - Initial schema with all core tables
+- `002_add_is_demo_flag.sql` - Demo user flag for backup exclusion
+- `003_add_user_fields.sql` - Phone, DOB, address, preferences (TEXT for SQLite)
+- `004_add_book_count.sql` - Book count column
+- `004_add_reviews_ratings.sql` - Reviews and ratings tables
+
+### Applying Migrations
+
+**For SQLite** (automatic via migration runner):
+```bash
+cd library-management
+npm run migrate  # Applies all migrations from data/migrations/sqlite/
+```
+
+**For Supabase** (manual via Dashboard - recommended):
+1. Go to [Supabase Dashboard](https://supabase.com/dashboard) → Your Project → SQL Editor
+2. Open migration file: `data/migrations/supabase/XXX_description.sql`
+3. Copy SQL content
+4. Paste into SQL Editor and click "Run"
+5. Verify success message
+
+**Note**: All migrations are idempotent (safe to run multiple times) using `IF NOT EXISTS` checks or `DO $$` blocks.
 
 ## 📋 Entity Relationship Diagram
 
@@ -392,27 +416,49 @@ CREATE TABLE notifications (
 
 ### Creating New Migrations
 
-1. **Create migration file**: `migrations/{storage}/XXX_description.sql`
+1. **Create migration file**: `data/migrations/{storage}/XXX_description.sql`
    - Use sequential numbering: `001`, `002`, `003`, etc.
    - Use descriptive names: `002_add_book_genre.sql`
+   - **Important**: Create matching files for both `sqlite/` and `supabase/` directories
 
-2. **Write SQL statements**:
+2. **Write SQL statements** (make them idempotent):
    ```sql
    -- Migration: 002_add_book_genre
-   ALTER TABLE books ADD COLUMN genre TEXT;
-   CREATE INDEX idx_books_genre ON books(genre);
+   -- Supabase version (use DO blocks for column checks)
+   DO $$ 
+   BEGIN
+       IF NOT EXISTS (
+           SELECT 1 FROM information_schema.columns 
+           WHERE table_name = 'books' AND column_name = 'genre'
+       ) THEN
+           ALTER TABLE public.books ADD COLUMN genre TEXT;
+       END IF;
+   END $$;
+   
+   -- SQLite version (supports IF NOT EXISTS directly)
+   ALTER TABLE books ADD COLUMN IF NOT EXISTS genre TEXT;
    ```
 
 3. **Test locally**:
    ```bash
-   npm run migrate  # Runs SQLite migrations
+   cd library-management
+   npm run migrate  # Runs SQLite migrations from data/migrations/sqlite/
    ```
 
 4. **Apply to Supabase**:
-   ```bash
-   node scripts/apply-supabase-migrations.js
-   # Copy output SQL to Supabase SQL Editor
-   ```
+   - **Option A: Via Supabase Dashboard (Recommended)**
+     1. Go to https://supabase.com/dashboard → Your Project → SQL Editor
+     2. Open the migration file: `data/migrations/supabase/XXX_description.sql`
+     3. Copy and paste the SQL into the SQL Editor
+     4. Click "Run" to execute
+     5. Verify success message
+   
+   - **Option B: Via Script**:
+     ```bash
+     cd library-management
+     node data/scripts/apply-supabase-migrations.js
+     # Copy output SQL to Supabase SQL Editor
+     ```
 
 ### Migration Best Practices
 

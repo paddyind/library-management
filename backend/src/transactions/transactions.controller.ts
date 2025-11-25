@@ -43,7 +43,12 @@ export class TransactionsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   create(@Body() createTransactionDto: CreateTransactionDto, @Req() req: Request) {
     const member = req.user as Member;
-    return this.transactionsService.create(createTransactionDto, member.id);
+    // Pass user data to ensure user exists in both databases
+    return this.transactionsService.create(createTransactionDto, member.id, {
+      email: member.email,
+      name: member.name,
+      role: member.role,
+    });
   }
 
   @Patch(':id/return')
@@ -64,5 +69,32 @@ export class TransactionsController {
   renewBook(@Param('id') transactionId: string, @Req() req: Request) {
     const member = req.user as Member;
     return this.transactionsService.renew(transactionId, member.id);
+  }
+
+  @Patch(':id/approve-return')
+  @UseGuards(RolesGuard)
+  @Roles(MemberRole.ADMIN, MemberRole.LIBRARIAN)
+  @ApiOperation({ summary: 'Approve a pending return request', description: 'Approve a return request and mark transaction as completed (Admin/Librarian only)' })
+  @ApiResponse({ status: 200, description: 'Return approved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin or Librarian role required' })
+  @ApiResponse({ status: 404, description: 'Transaction not found' })
+  approveReturn(@Param('id') transactionId: string, @Req() req: Request) {
+    const approver = req.user as Member;
+    return this.transactionsService.approveReturn(transactionId, approver.id);
+  }
+
+  @Patch(':id/reject-return')
+  @UseGuards(RolesGuard)
+  @Roles(MemberRole.ADMIN, MemberRole.LIBRARIAN)
+  @ApiOperation({ summary: 'Reject a pending return request', description: 'Reject a return request and change status back to active (Admin/Librarian only)' })
+  @ApiBody({ schema: { type: 'object', properties: { reason: { type: 'string' } }, required: [] } })
+  @ApiResponse({ status: 200, description: 'Return rejected successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin or Librarian role required' })
+  @ApiResponse({ status: 404, description: 'Transaction not found' })
+  rejectReturn(@Param('id') transactionId: string, @Body() body: { reason?: string }, @Req() req: Request) {
+    const approver = req.user as Member;
+    return this.transactionsService.rejectReturn(transactionId, approver.id, body.reason);
   }
 }

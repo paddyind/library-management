@@ -189,7 +189,7 @@ export class BooksService {
     return booksWithAvailability;
   }
 
-  async findOne(id: string): Promise<Book> {
+  async findOne(id: string, userId?: string): Promise<Book> {
     const storage = this.getPreferredStorage();
 
     if (storage === 'supabase') {
@@ -203,26 +203,49 @@ export class BooksService {
 
         if (error) {
           console.warn('⚠️ Supabase query error, falling back to SQLite:', error.message);
-          return this.sqliteFindOne(id);
+          return this.sqliteFindOne(id, userId);
         }
 
         // Check availability and set isAvailable property
         const isAvailable = await this.checkBookAvailability(data.id, 'supabase');
+        
+        // Check if current user has borrowed this book
+        let borrowedByMe = false;
+        if (userId) {
+          try {
+            const { data: transaction } = await this.supabaseService
+              .getClient()
+              .from('transactions')
+              .select('id')
+              .eq('bookId', id)
+              .eq('memberId', userId)
+              .eq('type', 'borrow')
+              .in('status', ['active', 'pending_return_approval'])
+              .maybeSingle();
+            
+            borrowedByMe = !!transaction;
+          } catch (checkError: any) {
+            // Ignore errors when checking user's transaction
+            console.debug('Could not check if user borrowed book:', checkError.message);
+          }
+        }
+        
         return {
           ...data,
-          status: isAvailable ? BookStatus.AVAILABLE : BookStatus.BORROWED,
-          isAvailable,
+          status: borrowedByMe ? 'with_me' : (isAvailable ? BookStatus.AVAILABLE : BookStatus.BORROWED),
+          isAvailable: isAvailable && !borrowedByMe,
+          borrowedByMe,
         };
       } catch (error: any) {
         console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
-        return this.sqliteFindOne(id);
+        return this.sqliteFindOne(id, userId);
       }
     }
 
-    return this.sqliteFindOne(id);
+    return this.sqliteFindOne(id, userId);
   }
 
-  private sqliteFindOne(id: string): Book {
+  private sqliteFindOne(id: string, userId?: string): Book {
     if (!this.sqliteService.isReady()) {
       throw new NotFoundException(`Book with ID "${id}" not found`);
     }
@@ -234,6 +257,24 @@ export class BooksService {
 
     // Check availability
     const isAvailable = this.checkBookAvailabilitySync(id);
+    
+    // Check if current user has borrowed this book
+    let borrowedByMe = false;
+    if (userId) {
+      try {
+        const db = this.sqliteService.getDatabase();
+        const transaction = db.prepare(`
+          SELECT id FROM transactions 
+          WHERE bookId = ? AND memberId = ? AND type = 'borrow' 
+          AND status IN ('active', 'pending_return_approval')
+        `).get(id, userId) as any;
+        
+        borrowedByMe = !!transaction;
+      } catch (checkError: any) {
+        // Ignore errors when checking user's transaction
+        console.debug('Could not check if user borrowed book:', checkError.message);
+      }
+    }
     
     // Get count from database if available
     let bookCount = 1;
@@ -253,9 +294,11 @@ export class BooksService {
       author: sqliteBook.author,
       isbn: sqliteBook.isbn,
       owner_id: sqliteBook.owner_id,
-      status: isAvailable ? BookStatus.AVAILABLE : BookStatus.BORROWED,
+      status: borrowedByMe ? 'with_me' : (isAvailable ? BookStatus.AVAILABLE : BookStatus.BORROWED),
       count: bookCount,
       forSale: false,
+      isAvailable: isAvailable && !borrowedByMe,
+      borrowedByMe,
       createdAt: sqliteBook.createdAt,
       updatedAt: sqliteBook.updatedAt,
     };

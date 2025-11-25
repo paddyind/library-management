@@ -12,6 +12,10 @@ function Profile() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [transactionStats, setTransactionStats] = useState({
+    totalBorrowed: 0,
+    activeLoans: 0,
+  });
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -47,60 +51,89 @@ function Profile() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setUser(response.data);
+      const [profileResponse, transactionsResponse] = await Promise.allSettled([
+        axios.get(`${API_BASE_URL}/profile`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${API_BASE_URL}/transactions/my-transactions`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => ({ data: [] })), // Fallback to empty array if endpoint doesn't exist
+      ]);
       
-      // Parse address from string to fields
-      let street = '', city = '', state = '', zipCode = '', country = '';
-      if (response.data.address) {
-        const addressParts = response.data.address.split(',').map(s => s.trim());
-        if (addressParts.length >= 1) street = addressParts[0];
-        if (addressParts.length >= 2) city = addressParts[1];
-        if (addressParts.length >= 3) state = addressParts[2];
-        if (addressParts.length >= 4) zipCode = addressParts[3];
-        if (addressParts.length >= 5) country = addressParts[4];
-      }
-      
-      // Parse preferences from JSON string to array
-      let preferences = [];
-      let otherPref = '';
-      if (response.data.preferences) {
-        try {
-          preferences = JSON.parse(response.data.preferences);
-          // Check if any preference is "Other: ..." and extract it
-          const otherIndex = preferences.findIndex(p => typeof p === 'string' && p.startsWith('Other:'));
-          if (otherIndex !== -1) {
-            otherPref = preferences[otherIndex].replace('Other: ', '');
-            preferences[otherIndex] = 'Other';
-          }
-        } catch (e) {
-          // If not JSON, treat as string and try to parse
-          if (typeof response.data.preferences === 'string') {
-            preferences = response.data.preferences.split(',').map(s => s.trim()).filter(Boolean);
+      if (profileResponse.status === 'fulfilled') {
+        const userData = profileResponse.value.data;
+        setUser(userData);
+        
+        // Parse address from string to fields
+        let street = '', city = '', state = '', zipCode = '', country = '';
+        if (userData.address) {
+          const addressParts = userData.address.split(',').map(s => s.trim());
+          if (addressParts.length >= 1) street = addressParts[0];
+          if (addressParts.length >= 2) city = addressParts[1];
+          if (addressParts.length >= 3) state = addressParts[2];
+          if (addressParts.length >= 4) zipCode = addressParts[3];
+          if (addressParts.length >= 5) country = addressParts[4];
+        }
+        
+        // Parse preferences from JSON string to array
+        let preferences = [];
+        let otherPref = '';
+        if (userData.preferences) {
+          try {
+            // Handle JSONB (Supabase) or JSON string
+            const prefs = typeof userData.preferences === 'string' 
+              ? JSON.parse(userData.preferences) 
+              : userData.preferences;
+            preferences = Array.isArray(prefs) ? prefs : [];
+            // Check if any preference is "Other: ..." and extract it
+            const otherIndex = preferences.findIndex(p => typeof p === 'string' && p.startsWith('Other:'));
+            if (otherIndex !== -1) {
+              otherPref = preferences[otherIndex].replace('Other: ', '');
+              preferences[otherIndex] = 'Other';
+            }
+          } catch (e) {
+            // If not JSON, treat as string and try to parse
+            if (typeof userData.preferences === 'string') {
+              preferences = userData.preferences.split(',').map(s => s.trim()).filter(Boolean);
+            }
           }
         }
+        
+        setOtherPreference(otherPref);
+        setFormData({
+          name: userData.name || '',
+          email: userData.email || '',
+          phone: userData.phone || '',
+          dateOfBirth: userData.dateOfBirth 
+            ? (typeof userData.dateOfBirth === 'string' 
+                ? userData.dateOfBirth.split('T')[0] 
+                : new Date(userData.dateOfBirth).toISOString().split('T')[0])
+            : '',
+          street: street,
+          city: city,
+          state: state,
+          zipCode: zipCode,
+          country: country,
+          preferences: preferences,
+          role: userData.role || '',
+        });
       }
       
-      setOtherPreference(otherPref);
-      setFormData({
-        name: response.data.name || '',
-        email: response.data.email || '',
-        phone: response.data.phone || '',
-        dateOfBirth: response.data.dateOfBirth 
-          ? (typeof response.data.dateOfBirth === 'string' 
-              ? response.data.dateOfBirth.split('T')[0] 
-              : new Date(response.data.dateOfBirth).toISOString().split('T')[0])
-          : '',
-        street: street,
-        city: city,
-        state: state,
-        zipCode: zipCode,
-        country: country,
-        preferences: preferences,
-        role: response.data.role || '',
-      });
+      // Calculate transaction stats
+      if (transactionsResponse.status === 'fulfilled') {
+        const transactions = transactionsResponse.value.data || [];
+        const totalBorrowed = transactions.filter(t => t.type === 'borrow').length;
+        const activeLoans = transactions.filter(t => 
+          t.type === 'borrow' && 
+          (t.status === 'active' || t.status === 'pending_return_approval')
+        ).length;
+        
+        setTransactionStats({
+          totalBorrowed,
+          activeLoans,
+        });
+      }
+      
       setError(null);
     } catch (err) {
       console.error('Failed to fetch profile:', err);
@@ -595,11 +628,11 @@ function Profile() {
                 <dl className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
                   <div className="px-4 py-5 bg-gray-50 shadow rounded-lg overflow-hidden sm:p-6">
                     <dt className="text-sm font-medium text-gray-500 truncate">Books Borrowed</dt>
-                    <dd className="mt-1 text-3xl font-semibold text-gray-900">0</dd>
+                    <dd className="mt-1 text-3xl font-semibold text-gray-900">{transactionStats.totalBorrowed}</dd>
                   </div>
                   <div className="px-4 py-5 bg-gray-50 shadow rounded-lg overflow-hidden sm:p-6">
                     <dt className="text-sm font-medium text-gray-500 truncate">Active Loans</dt>
-                    <dd className="mt-1 text-3xl font-semibold text-gray-900">0</dd>
+                    <dd className="mt-1 text-3xl font-semibold text-gray-900">{transactionStats.activeLoans}</dd>
                   </div>
                 </dl>
               </div>

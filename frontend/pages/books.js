@@ -223,7 +223,14 @@ function BooksPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredBooks.map((book) => (
+              {filteredBooks.map((book) => {
+                // Check if current user has borrowed this book
+                const borrowedByMe = user && myTransactions.some(t => 
+                  t.bookId === book.id && 
+                  (t.status === 'active' || t.status === 'pending_return_approval')
+                );
+                
+                return (
                 <div key={book.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-200">
                   <div className="p-5">
                     <div className="flex items-start justify-between mb-3">
@@ -236,14 +243,24 @@ function BooksPage() {
                     
                     <div className="flex items-center justify-between mb-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        (book.status === 'available' || book.isAvailable) 
+                        borrowedByMe || book.borrowedByMe || book.status === 'with_me'
+                          ? 'bg-blue-100 text-blue-800'
+                          : (book.status === 'available' || book.isAvailable) 
                           ? 'bg-green-100 text-green-800' 
                           : 'bg-red-100 text-red-800'
                       }`}>
-                        {(book.status === 'available' || book.isAvailable) ? 'Available' : 'Out of Stock'}
+                        {borrowedByMe || book.borrowedByMe || book.status === 'with_me'
+                          ? 'With me'
+                          : (book.status === 'available' || book.isAvailable) 
+                          ? 'Available' 
+                          : 'Out of Stock'}
                       </span>
                       <span className="text-xs text-gray-500">
-                        {(book.status === 'available' || book.isAvailable) ? '1 available' : '0 available'}
+                        {borrowedByMe || book.borrowedByMe || book.status === 'with_me'
+                          ? 'Borrowed by you'
+                          : (book.status === 'available' || book.isAvailable) 
+                          ? '1 available' 
+                          : '0 available'}
                       </span>
                     </div>
 
@@ -258,16 +275,17 @@ function BooksPage() {
                           const canBorrow = activeLoans.length < maxConcurrentLoans;
                           const isAvailable = book.status === 'available' || book.isAvailable || book.status?.toLowerCase() === 'available';
                           const isBorrowing = borrowingBookId === book.id;
+                          const isBorrowedByMe = borrowedByMe || book.borrowedByMe || book.status === 'with_me';
                           
                           return (
                             <>
                               <button
                                 onClick={() => handleBorrow(book.id)}
-                                disabled={!isAvailable || !canBorrow || isBorrowing}
+                                disabled={isBorrowedByMe || !isAvailable || !canBorrow || isBorrowing}
                                 className={`w-full py-2 px-4 rounded-md text-sm font-medium transition-colors duration-200 ${
                                   isBorrowing
                                     ? 'bg-indigo-400 text-white cursor-wait'
-                                    : !isAvailable || !canBorrow
+                                    : isBorrowedByMe || !isAvailable || !canBorrow
                                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                     : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                                 }`}
@@ -313,7 +331,8 @@ function BooksPage() {
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

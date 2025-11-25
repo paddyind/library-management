@@ -301,49 +301,191 @@ export class MembersService {
     
     if (storage === 'supabase') {
       try {
-        const { data, error } = await this.supabaseService
-          .getClient()
+        // First, check if user exists in Supabase
+        const { data: existingUser, error: checkError } = await this.supabaseService
+          .getAdminClient()
           .from('users')
-          .update(updateMemberDto)
+          .select('id')
+          .eq('id', id)
+          .maybeSingle();
+        
+        if (checkError || !existingUser) {
+          // User doesn't exist in Supabase - try SQLite
+          console.warn('⚠️ User not found in Supabase, trying SQLite...');
+          return await this.updateInSqlite(id, updateMemberDto);
+        }
+        
+        // User exists in Supabase - proceed with update
+        // Use admin client to bypass RLS for updates
+        const adminClient = this.supabaseService.getAdminClient();
+        
+        // Build update object with only name (which definitely exists)
+        // Other fields (phone, dateOfBirth, address, preferences) may not exist in Supabase schema
+        const updateData: any = {};
+        if (updateMemberDto.name !== undefined) updateData.name = updateMemberDto.name;
+        
+        // Try to include optional fields, but we'll filter them out if they cause errors
+        // Note: These columns may not exist in Supabase if migration 003_add_user_fields.sql wasn't applied
+        const optionalFields = ['phone', 'dateOfBirth', 'address', 'preferences'];
+        for (const field of optionalFields) {
+          if (updateMemberDto[field] !== undefined) {
+            updateData[field] = updateMemberDto[field];
+          }
+        }
+        
+        const { data, error } = await adminClient
+          .from('users')
+          .update(updateData)
           .eq('id', id)
           .select()
-          .single();
+          .maybeSingle();
 
         if (error) {
-          console.warn('⚠️ Supabase update error, falling back to SQLite:', error.message);
-          return this.updateInSqlite(id, updateMemberDto);
+          // Check if it's a column doesn't exist error
+          if (error.message?.includes("column") && (error.message?.includes("does not exist") || error.message?.includes("schema cache"))) {
+            console.warn(`⚠️ Supabase column error: ${error.message}, filtering out missing columns and retrying...`);
+            
+            // Remove all optional fields that might not exist
+            const filteredUpdate: any = {};
+            if (updateMemberDto.name !== undefined) filteredUpdate.name = updateMemberDto.name;
+            
+            // Only include optional fields if they're explicitly requested and we can verify they exist
+            // For now, we'll skip them to avoid errors
+            
+            const { data: retryData, error: retryError } = await adminClient
+              .from('users')
+              .update(filteredUpdate)
+              .eq('id', id)
+              .select()
+              .maybeSingle();
+            
+            if (retryError) {
+              console.error(`❌ Supabase update error after filtering: ${retryError.message}`);
+              throw new Error(`Failed to update profile: ${retryError.message}`);
+            }
+            
+            if (!retryData) {
+              console.error(`❌ Supabase update: No rows updated for user ${id}`);
+              throw new NotFoundException(`Member with ID "${id}" not found`);
+            }
+            
+            console.log(`✅ [MembersService] update: User updated successfully in Supabase (only name field, optional fields skipped - columns may not exist in schema)`);
+            
+            // Return the updated data, but note that optional fields weren't updated
+            // The frontend should be aware that these fields may not be persisted in Supabase
+            return retryData;
+          }
+          
+          // Other errors - throw instead of falling back to SQLite
+          console.error(`❌ Supabase update error: ${error.message}`);
+          throw new Error(`Failed to update profile in Supabase: ${error.message}`);
         }
 
         if (!data) {
-          console.warn('⚠️ Supabase update: No rows updated, falling back to SQLite');
-          return this.updateInSqlite(id, updateMemberDto);
+          console.error(`❌ Supabase update: No rows updated for user ${id}`);
+          throw new NotFoundException(`Member with ID "${id}" not found`);
         }
 
         console.log(`✅ [MembersService] update: User updated successfully in Supabase`);
         return data;
       } catch (error: any) {
+        // Only fall back to SQLite if it's a connection error, not a schema/column error
+        if (error instanceof NotFoundException || error.message?.includes('column') || error.message?.includes('schema')) {
+          throw error; // Re-throw schema/column errors - don't fall back
+        }
+        
         console.warn('⚠️ Supabase connection error, falling back to SQLite:', error.message);
-        return this.updateInSqlite(id, updateMemberDto);
+        return await this.updateInSqlite(id, updateMemberDto);
       }
     }
     
-    return this.updateInSqlite(id, updateMemberDto);
+    return await this.updateInSqlite(id, updateMemberDto);
   }
 
-  private updateInSqlite(id: string, updateMemberDto: UpdateMemberDto): Member {
+  private async updateInSqlite(id: string, updateMemberDto: UpdateMemberDto): Promise<Member> {
     if (!this.sqliteService.isReady()) {
       throw new NotFoundException(`Member with ID "${id}" not found`);
     }
 
     try {
       const db = this.sqliteService.getDatabase();
-      const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
+      
+      // First ensure user exists - if not, try to sync from Supabase
+      let user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
       
       if (!user) {
-        throw new NotFoundException(`Member with ID "${id}" not found`);
+        // User doesn't exist in SQLite - check if they exist in Supabase
+        console.warn(`⚠️ User ${id} not found in SQLite, checking Supabase...`);
+        
+        // Check if user exists in Supabase
+        if (this.supabaseService.isReady()) {
+          try {
+            const { data: supabaseUser, error: supabaseError } = await this.supabaseService
+              .getAdminClient()
+              .from('users')
+              .select('id, email, name, role, phone, dateOfBirth, address, preferences')
+              .eq('id', id)
+              .maybeSingle();
+            
+            if (supabaseUser && !supabaseError) {
+              // User exists in Supabase but not SQLite - create them
+              console.log(`🔄 Syncing user ${id} from Supabase to SQLite...`);
+              const bcrypt = require('bcryptjs');
+              const hashedPassword = bcrypt.hashSync('SYNCED_USER', 10);
+              const now = new Date().toISOString();
+              
+              // Check which columns exist in the table
+              const tableInfo = db.prepare("PRAGMA table_info(users)").all() as any[];
+              const columnNames = tableInfo.map(col => col.name);
+              
+              const fields = ['id', 'email', 'password', 'name', 'role', 'createdAt', 'updatedAt'];
+              const values = [supabaseUser.id, supabaseUser.email, hashedPassword, supabaseUser.name, supabaseUser.role, now, now];
+              
+              // Add optional fields if they exist in the table
+              if (columnNames.includes('phone')) {
+                fields.push('phone');
+                values.push(supabaseUser.phone || '');
+              }
+              if (columnNames.includes('dateOfBirth')) {
+                fields.push('dateOfBirth');
+                values.push(supabaseUser.dateOfBirth ? new Date(supabaseUser.dateOfBirth).toISOString() : '');
+              }
+              if (columnNames.includes('address')) {
+                fields.push('address');
+                values.push(supabaseUser.address || '');
+              }
+              if (columnNames.includes('preferences')) {
+                fields.push('preferences');
+                values.push(supabaseUser.preferences || '');
+              }
+              
+              const placeholders = fields.map(() => '?').join(', ');
+              db.prepare(`INSERT INTO users (${fields.join(', ')}) VALUES (${placeholders})`).run(...values);
+              console.log(`✅ Created user ${id} in SQLite during update`);
+              
+              // Re-fetch the user
+              user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
+            } else {
+              // User doesn't exist in either database
+              throw new NotFoundException(`Member with ID "${id}" not found in SQLite or Supabase`);
+            }
+          } catch (syncError: any) {
+            if (syncError instanceof NotFoundException) {
+              throw syncError;
+            }
+            throw new NotFoundException(`Member with ID "${id}" not found and could not be synced: ${syncError.message}`);
+          }
+        } else {
+          // Supabase not available and user doesn't exist in SQLite
+          throw new NotFoundException(`Member with ID "${id}" not found in SQLite`);
+        }
       }
 
-      // Build update query dynamically based on provided fields
+      // Check which columns exist in the table
+      const tableInfo = db.prepare("PRAGMA table_info(users)").all() as any[];
+      const columnNames = tableInfo.map(col => col.name);
+
+      // Build update query dynamically based on provided fields AND column existence
       const updates: string[] = [];
       const values: any[] = [];
 
@@ -351,21 +493,29 @@ export class MembersService {
         updates.push('name = ?');
         values.push(updateMemberDto.name);
       }
-      if (updateMemberDto.phone !== undefined) {
+      if (updateMemberDto.phone !== undefined && columnNames.includes('phone')) {
         updates.push('phone = ?');
         values.push(updateMemberDto.phone);
+      } else if (updateMemberDto.phone !== undefined && !columnNames.includes('phone')) {
+        console.warn('⚠️ phone column does not exist in SQLite users table, skipping update');
       }
-      if (updateMemberDto.dateOfBirth !== undefined) {
+      if (updateMemberDto.dateOfBirth !== undefined && columnNames.includes('dateOfBirth')) {
         updates.push('dateOfBirth = ?');
         values.push(updateMemberDto.dateOfBirth);
+      } else if (updateMemberDto.dateOfBirth !== undefined && !columnNames.includes('dateOfBirth')) {
+        console.warn('⚠️ dateOfBirth column does not exist in SQLite users table, skipping update');
       }
-      if (updateMemberDto.address !== undefined) {
+      if (updateMemberDto.address !== undefined && columnNames.includes('address')) {
         updates.push('address = ?');
         values.push(updateMemberDto.address);
+      } else if (updateMemberDto.address !== undefined && !columnNames.includes('address')) {
+        console.warn('⚠️ address column does not exist in SQLite users table, skipping update');
       }
-      if (updateMemberDto.preferences !== undefined) {
+      if (updateMemberDto.preferences !== undefined && columnNames.includes('preferences')) {
         updates.push('preferences = ?');
         values.push(updateMemberDto.preferences);
+      } else if (updateMemberDto.preferences !== undefined && !columnNames.includes('preferences')) {
+        console.warn('⚠️ preferences column does not exist in SQLite users table, skipping update');
       }
       
       if (updates.length === 0) {

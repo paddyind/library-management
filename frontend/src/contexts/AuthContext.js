@@ -22,10 +22,27 @@ export const AuthProvider = ({ children }) => {
           setUser(response.data);
           setLoading(false);
         })
-        .catch(() => {
-          localStorage.removeItem('token');
-          setUser(null);
-          setLoading(false);
+        .catch((error) => {
+          // Check if it's a PROFILE_MISSING error
+          const errorCode = error.response?.data?.code;
+          const errorMessage = error.response?.data?.message || '';
+          
+          if (errorCode === 'PROFILE_MISSING' || errorMessage.includes('profile is missing')) {
+            // Profile missing - logout and redirect to login with error
+            localStorage.removeItem('token');
+            setUser(null);
+            setLoading(false);
+            // Redirect to login with error message
+            if (typeof window !== 'undefined') {
+              const message = errorMessage || 'Your account profile is missing. Please contact support.';
+              window.location.href = `/login?error=${encodeURIComponent('PROFILE_MISSING')}&message=${encodeURIComponent(message)}`;
+            }
+          } else {
+            // Other errors - just logout
+            localStorage.removeItem('token');
+            setUser(null);
+            setLoading(false);
+          }
         });
     } else {
       setLoading(false);
