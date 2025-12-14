@@ -48,24 +48,7 @@ services:
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD}
-      - AUTH_STORAGE=${AUTH_STORAGE:-supabase}
-      # Proxy configuration for corporate networks (optional)
-      - HTTP_PROXY=${HTTP_PROXY}
-      - HTTPS_PROXY=${HTTPS_PROXY}
-      - NO_PROXY=${NO_PROXY}
-      - NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
-      # Bypass SSL verification for corporate networks (temporary fix)
-      - NODE_TLS_REJECT_UNAUTHORIZED=0
-    dns:
-      - 8.8.8.8          # Google DNS (primary)
-      - 8.8.4.4          # Google DNS (secondary)
-      - 1.1.1.1          # Cloudflare DNS
-      - 208.67.222.222    # OpenDNS as backup
-    # Bypass DNS lookup for Supabase - use IP addresses directly
-    # This fixes corporate VPN issues where DNS blocks Supabase
-    extra_hosts:
-      - "qgbofecjkmihqgfcrdyg.supabase.co:104.18.38.10"    # Primary IP
-      - "qgbofecjkmihqgfcrdyg.supabase.co:172.64.149.246"  # Secondary IP (Cloudflare)
+      - AUTH_STORAGE=${AUTH_STORAGE:-auto}
     networks:
       - library-network
     container_name: library-management-backend

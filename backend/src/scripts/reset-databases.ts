@@ -224,9 +224,7 @@ async function resetDatabases() {
           console.error(`   💡 Solutions:`);
           console.error(`      1. Check network connectivity`);
           console.error(`      2. Verify Supabase URL is correct: ${SUPABASE_URL}`);
-          console.error(`      3. Check if VPN is required for Supabase access`);
-          console.error(`      4. Set HTTP_PROXY/HTTPS_PROXY if behind a proxy`);
-          console.error(`      5. Use SQLite only: Set AUTH_STORAGE=sqlite`);
+          console.error(`      3. Use SQLite only: Set AUTH_STORAGE=sqlite`);
           console.error(`   ⚠️  Skipping Supabase reset. SQLite has been reset successfully.`);
           return;
         } else {

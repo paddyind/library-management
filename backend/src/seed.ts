@@ -351,7 +351,7 @@ async function seedSupabase() {
         error.message?.includes('fetch failed') ||
         error.cause?.code === 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY') {
       console.error('\n❌ SSL Certificate Error: Unable to verify Supabase SSL certificate');
-      console.error('💡 This is common in corporate networks. Solutions:');
+      console.error('💡 Solutions:');
       console.error('   1. Run Supabase SQL migrations manually via Supabase SQL Editor');
       console.error('   2. Create auth users manually in Supabase Dashboard → Authentication');
       console.error('   3. Use SQLite instead: Set AUTH_STORAGE=sqlite');

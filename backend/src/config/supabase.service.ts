@@ -295,7 +295,7 @@ export class SupabaseService implements OnModuleInit {
             'apikey': this.configService.get<string>('NEXT_PUBLIC_SUPABASE_ANON_KEY') || 
                       this.configService.get<string>('SUPABASE_KEY') || '',
           },
-          // Handle SSL certificate issues (common in corporate networks)
+          // Handle SSL certificate issues
           rejectUnauthorized: true,
           // Use system CA certificates
           ca: undefined, // Use default system CAs
@@ -310,7 +310,7 @@ export class SupabaseService implements OnModuleInit {
         });
 
         req.on('error', (err: any) => {
-          // If SSL error, try with relaxed validation (for corporate proxies)
+          // If SSL error, try with relaxed validation
           if (err.code === 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY' || 
               err.code === 'CERT_UNTRUSTED' ||
               err.message?.includes('certificate')) {
@@ -394,33 +394,30 @@ export class SupabaseService implements OnModuleInit {
         console.error('❌ Supabase health check failed: DNS resolution error');
         console.error('💡 Solutions:');
         console.error('   1. Check network connectivity');
-        console.error('   2. Configure proxy: Set HTTP_PROXY and HTTPS_PROXY in .env');
-        console.error('   3. Docker DNS configured, but may need VPN DNS bypass');
-        console.error('   4. Set AUTH_STORAGE=sqlite to use SQLite only');
+        console.error('   2. Verify DNS settings');
+        console.error('   3. Set AUTH_STORAGE=sqlite to use SQLite only');
       } else if (error.message === 'TIMEOUT_ERROR' || error.message?.includes('timeout') ||
                  error.message === 'Health check timeout' || error.name === 'TimeoutError' ||
                  error.name === 'AbortError') {
         console.error('❌ Supabase health check failed: Connection timeout (10s)');
         console.error('💡 Solutions:');
-        console.error('   1. Check firewall/proxy settings');
+        console.error('   1. Check firewall settings');
         console.error('   2. Verify Supabase URL is correct');
         console.error('   3. Check if Supabase project is paused (free tier)');
-        console.error('   4. Configure HTTP_PROXY/HTTPS_PROXY if behind corporate proxy');
-        console.error('   5. Set AUTH_STORAGE=sqlite to use SQLite only');
+        console.error('   4. Set AUTH_STORAGE=sqlite to use SQLite only');
       } else if (error.message?.includes('fetch failed') || error.message?.includes('ECONNREFUSED') ||
                  error.message?.includes('ENOTFOUND') || error.message?.includes('network')) {
         console.error('❌ Supabase health check failed: Network error');
         console.error('💡 This usually means:');
         console.error('   1. DNS cannot resolve the domain');
         console.error('   2. Firewall is blocking HTTPS to Supabase');
-        console.error('   3. Corporate proxy required (set HTTP_PROXY/HTTPS_PROXY)');
-        console.error('   4. Set AUTH_STORAGE=sqlite to use SQLite only');
+        console.error('   3. Set AUTH_STORAGE=sqlite to use SQLite only');
       } else {
         console.error('❌ Supabase health check failed:', error.message);
         console.error('💡 Set AUTH_STORAGE=sqlite to use SQLite only');
       }
       console.warn('⚠️  Switching to SQLite mode for this session');
-      console.warn('⚠️  Restart the server after fixing network/proxy issues to re-enable Supabase');
+      console.warn('⚠️  Restart the server after fixing network issues to re-enable Supabase');
     }
   }
 

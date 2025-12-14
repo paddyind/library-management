@@ -79,14 +79,7 @@ A modern, full-stack library management system with **anonymous book browsing** 
    - **Supabase mode**: Force use of Supabase only (set `AUTH_STORAGE=supabase`)
    - **SQLite mode**: Force use of SQLite only (set `AUTH_STORAGE=sqlite`)
    
-   **Important**: Health check is performed once at server startup. If Supabase fails the health check, the system switches to SQLite for the entire session. Restart the server after fixing network/proxy issues to retest Supabase.
-   
-   For corporate networks with proxy, also add to `.env`:
-   ```bash
-   HTTP_PROXY=http://proxy.company.com:8080
-   HTTPS_PROXY=http://proxy.company.com:8080
-   NO_PROXY=localhost,127.0.0.1,*.local
-   ```
+   **Important**: Health check is performed once at server startup. If Supabase fails the health check, the system switches to SQLite for the entire session. Restart the server after fixing network issues to retest Supabase.
    
    See [DATABASE_SETUP_INSTRUCTIONS.md](DATABASE_SETUP_INSTRUCTIONS.md) for detailed database setup and sync instructions.
 

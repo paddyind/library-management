@@ -642,7 +642,7 @@ export class TransactionsService {
 
         // Update transaction to pending return approval (requires librarian/admin approval)
         // Use admin client to bypass RLS for updates
-        // No timeout - wait as long as needed (VPN/proxy can be extremely slow)
+        // No timeout - wait as long as needed
         console.log(`🔄 Updating transaction ${transactionId} to pending_return_approval...`);
         
         const adminClient = this.supabaseService.getAdminClient();
@@ -701,17 +701,17 @@ export class TransactionsService {
       } catch (error: any) {
         console.warn('⚠️ Supabase return error:', error.message);
         
-        // If Supabase is primary but failing due to network/proxy, we cannot fall back to SQLite
+        // If Supabase is primary but failing due to network issues, we cannot fall back to SQLite
         // because the transaction record only exists in Supabase
         if (storage === 'supabase') {
           console.error('❌ Cannot fall back to SQLite - transaction only exists in Supabase');
           console.error('💡 Possible solutions:');
-          console.error('   1. Disconnect from VPN and try again');
-          console.error('   2. Check if corporate proxy is blocking Supabase');
-          console.error('   3. Contact IT to whitelist *.supabase.co');
+          console.error('   1. Check network connectivity');
+          console.error('   2. Verify Supabase connection');
+          console.error('   3. Contact support if issue persists');
           
           // Return a more user-friendly error
-          throw new Error('Unable to return book due to network restrictions. The transaction exists in Supabase but the corporate proxy is blocking the connection. Please try again later or contact support.');
+          throw new Error('Unable to return book due to network restrictions. The transaction exists in Supabase but the connection is blocked. Please try again later or contact support.');
         }
         
         // Fall back to SQLite if it's not primary storage
