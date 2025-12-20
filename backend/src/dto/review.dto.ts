@@ -16,5 +16,10 @@ export class CreateReviewDto {
   @IsOptional()
   @IsNumber()
   rating?: number;
+
+  @ApiProperty({ example: 'transaction-id-123', description: 'ID of the completed transaction (optional)', required: false })
+  @IsOptional()
+  @IsString()
+  transactionId?: string;
 }
 

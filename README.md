@@ -26,7 +26,7 @@ A modern, full-stack library management system with **anonymous book browsing** 
 - 🔔 **Notifications** - Stay updated with due dates and library news
 - ⚙️ **Profile Management** - Update your information and preferences
 - 📊 **Transaction History** - View your complete borrowing history
-- ⭐ **Reviews and Ratings** - Submit reviews and ratings for books (with average rating display)
+- ⭐ **Reviews and Ratings** - Submit reviews and ratings for books (with approval workflow and email notifications)
 
 ### For Administrators
 - 👥 **User Management** - Complete CRUD operations for user accounts
@@ -34,6 +34,8 @@ A modern, full-stack library management system with **anonymous book browsing** 
 - 📚 **Book Catalog** - Manage the entire book inventory (including books for sale)
 - 📈 **Analytics** - View library-wide statistics and reports
 - 🔐 **Role-Based Access** - Fine-grained permission control
+- ✅ **Review Approvals** - Approve or reject pending ratings and reviews
+- 📧 **Email Notifications** - Automatic email notifications for approval/rejection actions
 
 ---
 
@@ -81,7 +83,7 @@ A modern, full-stack library management system with **anonymous book browsing** 
    
    **Important**: Health check is performed once at server startup. If Supabase fails the health check, the system switches to SQLite for the entire session. Restart the server after fixing network issues to retest Supabase.
    
-   See [DATABASE_SETUP_INSTRUCTIONS.md](DATABASE_SETUP_INSTRUCTIONS.md) for detailed database setup and sync instructions.
+   See [DATABASE.md](DATABASE.md) for detailed database setup and management guide.
 
 3. **Initialize databases** (Choose one method)
    
@@ -139,7 +141,7 @@ A modern, full-stack library management system with **anonymous book browsing** 
    docker compose exec backend npm run db:sync
    ```
    
-   See [DATABASE_SETUP_INSTRUCTIONS.md](DATABASE_SETUP_INSTRUCTIONS.md) for complete setup guide with all options.
+   See [DATABASE.md](DATABASE.md) for complete setup guide with all options.
 
 4. **Start the application**
    ```bash
@@ -200,7 +202,7 @@ These routes require admin role and redirect non-admins to home page:
 ## 📚 Documentation
 
 - **[Architecture](ARCHITECTURE.md)** - System architecture and design decisions
-- **[Database Modeling](DATABASE_MODELING.md)** - Complete database schema and modeling documentation
+- **[Database](DATABASE.md)** - Database setup, schema, and management guide
 - **[Changelog](CHANGELOG.md)** - Version history and updates
 - **[API Documentation](http://localhost:4000/api-docs)** - Interactive Swagger/OpenAPI documentation (when server is running)
 
@@ -559,7 +561,7 @@ docker compose exec backend npm run db:reset
 
 - ❌ **Demo users** (is_demo = true) - Excluded (can be recreated)
 
-**See**: [DATABASE_MODELING.md](DATABASE_MODELING.md) for complete schema documentation.
+**See**: [DATABASE.md](DATABASE.md) for complete schema documentation.
 
 ---
 

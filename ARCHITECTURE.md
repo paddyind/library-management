@@ -2,174 +2,308 @@
 
 ## System Overview
 
-The Library Management System is built as a modern web application with a clear separation of concerns and modular architecture. This document outlines the high-level architecture and design decisions.
+The Library Management System is a full-stack application built with modern web technologies, supporting both Supabase (PostgreSQL) and SQLite databases with automatic fallback.
 
-## Architecture Diagram
+## Technology Stack
+
+### Frontend
+- **Framework**: Next.js (React)
+- **Styling**: Tailwind CSS
+- **State Management**: React Context API
+- **HTTP Client**: Axios
+- **Authentication**: JWT tokens stored in localStorage
+
+### Backend
+- **Framework**: NestJS (Node.js)
+- **Language**: TypeScript
+- **Databases**: 
+  - Supabase (PostgreSQL) - Primary
+  - SQLite - Fallback
+- **Authentication**: JWT with bcrypt password hashing
+- **API Documentation**: Swagger/OpenAPI
+- **Email**: Nodemailer (SMTP)
+
+### Infrastructure
+- **Containerization**: Docker & Docker Compose
+- **Reverse Proxy**: Nginx (optional)
+- **Process Management**: PM2 (production)
+
+## System Architecture
 
 ```
-┌─────────────────┐     ┌──────────────┐     ┌────────────────┐
-│    Frontend     │     │    Nginx     │     │    Backend     │
-│    (Next.js)    │────▶│  (Reverse   │────▶│    (NestJS)    │
-│                 │     │   Proxy)     │     │                │
-└─────────────────┘     └──────────────┘     └────────────────┘
-                                                     │
-                                                     │
-                                            ┌────────────────┐
-                                            │    SQLite      │
-                                            │   Database     │
-                                            └────────────────┘
-
+┌─────────────────┐
+│   Frontend      │
+│   (Next.js)     │
+│   Port: 3100    │
+└────────┬────────┘
+         │ HTTP/REST
+         │
+┌────────▼────────┐
+│   Backend       │
+│   (NestJS)      │
+│   Port: 4000    │
+└────────┬────────┘
+         │
+    ┌────┴────┐
+    │         │
+┌───▼───┐ ┌──▼────┐
+│Supabase│ │SQLite │
+│(Primary)│ │(Fallback)│
+└───────┘ └───────┘
 ```
 
-## Component Architecture
+## Module Structure
 
-### 1. Frontend (Next.js + TypeScript)
-- **App Router**: Modern Next.js routing system
-- **Components**: Reusable UI components
-- **Services**: API integration layer
-- **Hooks**: Custom React hooks for state management
-- **Utils**: Helper functions and utilities
-- **Types**: TypeScript type definitions
+### Backend Modules
 
-### 2. Backend (NestJS + TypeScript)
-- **Modules**:
-  - `Auth`: Handles user authentication and JWTs
-  - `Users`: Manages user data and CRUD operations
-  - `Groups`: Manages user groups with role-based access and member management
-  - `Books`: Manages the book catalog with public access
-  - `Loans`: Manages book borrowing and returns
-  - `Reservations`: Manages book reservations
-  - `Profile`: Manages user profiles
-  - `Notifications`: Handles notification CRUD and email notifications
-  - `Transactions`: Manages user transactions, including loans and reservations
-  - `Search`: Handles global search functionality
-  - `Subscriptions`: Manages user subscriptions and free trials
-  - `Reviews`: Manages book reviews with dual-database support (SQLite/Supabase)
-  - `Ratings`: Manages book ratings (1-5 stars) with dual-database support (SQLite/Supabase)
-- **Controllers**: HTTP request handlers with proper validation
-- **Services**: Business logic implementation with error handling
-- **Models**: TypeORM entities with relationships
-- **DTOs**: Data transfer objects with validation decorators
-- **Guards**: Authentication (JwtAuthGuard) and authorization (RolesGuard)
-- **Interceptors**: Request/Response transformation
-- **Middleware**: Request processing pipeline
+#### Core Modules
+- **AuthModule**: Authentication and authorization
+- **MembersModule**: User/member management
+- **BooksModule**: Book catalog management
+- **TransactionsModule**: Borrow/return transactions
+- **RatingsModule**: Book ratings (published immediately, no approval)
+- **ReviewsModule**: Book reviews with admin approval workflow
 
-### 3. Database (SQLite)
-- **Models**:
-  - `User`: User information, authentication, and relationships (includes phone, DOB, address, etc.)
-  - `Group`: User groups for RBAC with permissions array
-  - `Book`: Book catalog with status and availability (includes count, status, forSale, price)
-  - `Loan`: Active book loans with due dates
-  - `Reservation`: Book reservations queue
-  - `Subscription`: User subscription tiers and trials
-  - `Notification`: User notifications with types and read status
-  - `Review`: Book reviews (one review per user per book)
-  - `Rating`: Book ratings (1-5 stars, one rating per user per book)
+#### Supporting Modules
+- **ConfigModule**: Database configuration (Supabase/SQLite)
+- **EmailModule**: Email notification service
+- **NotificationsModule**: In-app notifications
+- **SearchModule**: Full-text search capabilities
 
-### 4. Authentication
-- JWT-based authentication
-- Role-based access control (RBAC)
-- Secure password hashing
-- Session management
+### Frontend Pages
 
-### 5. Route Protection (Frontend)
-The frontend uses Higher-Order Components (HOCs) to protect routes:
+#### Public Pages
+- `/` - Welcome/Landing page
+- `/books` - Book catalog (browsable without login)
+- `/books/[id]` - Book details
+- `/search` - Search page
 
-- **withAuth**: Protects member-only routes
-  - Checks if user is authenticated
-  - Redirects to `/login` if not authenticated
-  - Used on: books, dashboard, profile, settings, transactions, notifications, reports
+#### Member Pages
+- `/dashboard` - Member dashboard
+- `/transactions` - Transaction history
+- `/settings` - Profile settings
 
-- **withAdminAuth**: Protects admin-only routes
-  - Checks if user is authenticated AND has admin role
-  - Redirects to `/` if not admin
-  - Used on: admin, members pages
-
-- **withMemberAuth**: Protects member-specific routes
-  - Similar to withAuth with member-specific logic
-  - Used on: my-requests, request-book pages
-
-**Authentication Flow**:
-```
-User Access → HOC Check → AuthContext → Token Validation → Allow/Redirect
-```
-
-**Entity Aliases** (Backend Compatibility):
-- Created alias files to maintain backward compatibility
-- User entity → Member entity (with User alias export)
-- Allows gradual migration without breaking existing code
-- Files: user.entity.ts, users.service.ts, users.module.ts, user.dto.ts
-
-## Security Measures
-
-1. **API Security**
-   - CORS configuration
-   - Rate limiting
-   - Input validation
-   - XSS protection
-   - CSRF protection
-
-2. **Data Security**
-   - Password hashing
-   - Encrypted JWT tokens
-   - SQL injection prevention
-   - Input sanitization
-
-3. **Infrastructure Security**
-   - Nginx reverse proxy
-   - Docker container isolation
-   - Environment variable protection
-   - Regular security updates
+#### Admin Pages
+- `/admin/approvals` - Pending reviews approval (ratings are immediate)
+- `/settings` - Admin settings (with additional tabs)
 
 ## Data Flow
 
-1. **Book Management**
-   ```
-   User → Frontend → API Gateway → Backend Controller → Service → Database
-   ```
+### Rating/Review Submission Flow
 
-2. **Authentication**
-   ```
-   User → Login Form → Auth API → JWT Generation → Token Storage
-   ```
+```
+1. Member returns book
+   ↓
+2. Admin approves return (transaction status → 'completed')
+   ↓
+3. Member sees rating/review prompt
+   ↓
+4. Member submits rating/review
+   ↓
+5. Rating/review status → 'pending'
+   ↓
+6. Admin reviews pending reviews on /admin/approvals (ratings are immediate)
+   ↓
+7. Admin approves/rejects
+   ↓
+8. Email notification sent to member
+   ↓
+9. If approved: Rating/review visible to all users
+```
 
-3. **Lending Process**
-   ```
-   User → Book Selection → Loan Creation → Database Update → Notification
-   ```
+### Authentication Flow
 
-## Scalability Considerations
+```
+1. User submits credentials
+   ↓
+2. Backend validates (Supabase or SQLite)
+   ↓
+3. JWT token generated
+   ↓
+4. Token stored in localStorage
+   ↓
+5. Token sent with all API requests
+   ↓
+6. JwtAuthGuard validates token
+   ↓
+7. Request processed with user context
+```
 
-1. **Database**
-   - Connection pooling
-   - Query optimization
-   - Index management
+## Database Strategy
 
-2. **API**
-   - Caching strategy
-   - Request throttling
-   - Load balancing ready
+### Dual Database Support
 
-3. **Frontend**
-   - Code splitting
-   - Static generation
-   - Image optimization
+The system supports both Supabase and SQLite with automatic selection:
 
-## Development Workflow
+1. **Configuration Priority**:
+   - If `AUTH_STORAGE=supabase` → Use Supabase
+   - If `AUTH_STORAGE=sqlite` → Use SQLite
+   - If `AUTH_STORAGE=auto` → Auto-detect (prefer Supabase if available)
 
-1. **Local Development**
-   - Docker Compose for services
-   - Hot reload enabled
-   - TypeScript compilation
-   - ESLint + Prettier
+2. **Fallback Mechanism**:
+   - If Supabase connection fails → Fallback to SQLite
+   - All operations support both databases
+   - Schema is kept in sync
 
-2. **Testing**
-   - Unit tests
-   - Integration tests
-   - E2E tests
-   - Test coverage reports
+3. **Health Checks**:
+   - Supabase health check on startup
+   - Automatic fallback on connection errors
+   - Graceful degradation
 
-3. **Deployment**
-   - Docker-based deployment
-   - Environment configuration
-   - Health monitoring
+## Security Architecture
+
+### Authentication
+- JWT tokens with configurable expiration
+- Password hashing with bcrypt (10 rounds)
+- Token validation on every protected endpoint
+
+### Authorization
+- Role-based access control (RBAC)
+- Three roles: Admin, Librarian, Member
+- Route guards for protected endpoints
+- Frontend route protection with `withAuth` HOC
+
+### Data Protection
+- SQL injection prevention (parameterized queries)
+- XSS protection (input sanitization)
+- CORS configuration
+- Rate limiting (recommended for production)
+
+## API Architecture
+
+### RESTful Design
+- Standard HTTP methods (GET, POST, PATCH, DELETE)
+- Resource-based URLs
+- Consistent error responses
+- Swagger documentation
+
+### Endpoints Structure
+
+```
+/api/auth/*          - Authentication
+/api/members/*       - User management
+/api/books/*         - Book catalog
+/api/transactions/*  - Borrow/return
+/api/ratings/*       - Ratings (published immediately)
+/api/reviews/*      - Reviews (require admin approval)
+/api/search/*        - Search functionality
+```
+
+### New Endpoints (v2.0.0)
+
+```
+GET  /api/reviews/pending        - Get pending reviews (Admin only)
+PATCH /api/reviews/:id/approve   - Approve review (Admin only)
+PATCH /api/reviews/:id/reject    - Reject review with reason (Admin only)
+```
+
+## Email Service Architecture
+
+### Configuration
+- SMTP settings via environment variables
+- Optional service (gracefully degrades if not configured)
+- HTML email templates
+
+### Email Types
+- Review approval notifications (ratings are immediate, no approval needed)
+- Review rejection notifications (with reason)
+
+## Frontend Architecture
+
+### Component Structure
+```
+pages/
+  ├── index.js              - Landing page
+  ├── books/
+  │   └── [id].js          - Book details
+  ├── admin/
+  │   └── approvals.js     - Admin approvals page
+  └── transactions.js      - Transaction history
+
+src/
+  ├── components/
+  │   ├── layout/          - Layout components
+  │   └── ...
+  ├── contexts/            - React contexts
+  ├── utils/               - Utility functions
+  └── ...
+```
+
+### State Management
+- React Context for authentication
+- Local component state for UI
+- Server state via API calls
+
+## Deployment Architecture
+
+### Docker Compose Structure
+```
+services:
+  frontend:
+    - Next.js application
+    - Port: 3100
+  backend:
+    - NestJS application
+    - Port: 4000
+    - Environment variables
+    - Volume mounts for SQLite
+```
+
+### Environment Configuration
+- `.env` files for configuration
+- Docker secrets for sensitive data
+- Environment-specific settings
+
+## Performance Considerations
+
+### Database
+- Indexed foreign keys
+- Query optimization
+- Connection pooling (Supabase)
+
+### Frontend
+- Code splitting
+- Lazy loading
+- Optimized images
+- Caching strategies
+
+### Backend
+- Efficient database queries
+- Caching where appropriate
+- Async operations
+- Error handling and logging
+
+## Scalability
+
+### Horizontal Scaling
+- Stateless backend (can scale horizontally)
+- Database connection pooling
+- Load balancer ready
+
+### Vertical Scaling
+- Optimized queries
+- Efficient data structures
+- Resource monitoring
+
+## Monitoring and Logging
+
+### Logging
+- Console logging for development
+- Structured logging recommended for production
+- Error tracking
+
+### Monitoring
+- Health check endpoints
+- Database connection monitoring
+- Performance metrics
+
+## Future Enhancements
+
+### Planned Features
+- Real-time notifications (WebSockets)
+- Advanced analytics dashboard
+- Mobile app (React Native)
+- Integration with external library systems
+- Automated email reminders
+- Fine calculation system
+- Reservation system enhancements

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsNumber, Min, Max } from 'class-validator';
+import { IsNotEmpty, IsString, IsNumber, Min, Max, IsOptional } from 'class-validator';
 
 export class CreateRatingDto {
   @ApiProperty({ example: 'book-id-123', description: 'ID of the book being rated' })
@@ -13,5 +13,10 @@ export class CreateRatingDto {
   @Min(1)
   @Max(5)
   rating: number;
+
+  @ApiProperty({ example: 'transaction-id-123', description: 'ID of the completed transaction (optional)', required: false })
+  @IsOptional()
+  @IsString()
+  transactionId?: string;
 }
 

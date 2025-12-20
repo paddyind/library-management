@@ -90,6 +90,9 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
 
   private initializeDatabase() {
     if (!this.db) return;
+    
+    // Enable foreign key constraints
+    this.db.pragma('foreign_keys = ON');
 
     // Create users table
     this.db.exec(`
@@ -234,14 +237,54 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
         id TEXT PRIMARY KEY,
         bookId TEXT NOT NULL,
         memberId TEXT NOT NULL,
+        transactionId TEXT,
         review TEXT NOT NULL,
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+        rejectionReason TEXT,
+        approvedBy TEXT,
+        approvedAt TEXT,
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL,
         FOREIGN KEY (bookId) REFERENCES books(id) ON DELETE CASCADE,
         FOREIGN KEY (memberId) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (transactionId) REFERENCES transactions(id) ON DELETE SET NULL,
+        FOREIGN KEY (approvedBy) REFERENCES users(id) ON DELETE SET NULL,
         UNIQUE(bookId, memberId)
       )
     `);
+
+    // Add new columns to existing reviews table if they don't exist
+    try {
+      this.db.exec(`ALTER TABLE reviews ADD COLUMN transactionId TEXT`);
+    } catch (e) {
+      // Column might already exist, ignore
+    }
+    try {
+      this.db.exec(`ALTER TABLE reviews ADD COLUMN status TEXT DEFAULT 'pending'`);
+    } catch (e) {
+      // Column might already exist, ignore
+    }
+    try {
+      this.db.exec(`ALTER TABLE reviews ADD COLUMN rejectionReason TEXT`);
+    } catch (e) {
+      // Column might already exist, ignore
+    }
+    try {
+      this.db.exec(`ALTER TABLE reviews ADD COLUMN approvedBy TEXT`);
+    } catch (e) {
+      // Column might already exist, ignore
+    }
+    try {
+      this.db.exec(`ALTER TABLE reviews ADD COLUMN approvedAt TEXT`);
+    } catch (e) {
+      // Column might already exist, ignore
+    }
+    // Update existing reviews to approved status (for backward compatibility)
+    try {
+      this.db.exec(`UPDATE reviews SET status = 'approved' WHERE status IS NULL OR status = ''`);
+    } catch (e) {
+      // Ignore errors
+    }
 
     // Create indexes for reviews
     this.db.exec(`
@@ -253,6 +296,12 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_reviews_created ON reviews(createdAt)
     `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_reviews_status ON reviews(status)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_reviews_transaction_id ON reviews(transactionId)
+    `);
 
     // Create ratings table
     this.db.exec(`
@@ -260,14 +309,54 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
         id TEXT PRIMARY KEY,
         bookId TEXT NOT NULL,
         memberId TEXT NOT NULL,
+        transactionId TEXT,
         rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+        rejectionReason TEXT,
+        approvedBy TEXT,
+        approvedAt TEXT,
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL,
         FOREIGN KEY (bookId) REFERENCES books(id) ON DELETE CASCADE,
         FOREIGN KEY (memberId) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (transactionId) REFERENCES transactions(id) ON DELETE SET NULL,
+        FOREIGN KEY (approvedBy) REFERENCES users(id) ON DELETE SET NULL,
         UNIQUE(bookId, memberId)
       )
     `);
+
+    // Add new columns to existing ratings table if they don't exist
+    try {
+      this.db.exec(`ALTER TABLE ratings ADD COLUMN transactionId TEXT`);
+    } catch (e) {
+      // Column might already exist, ignore
+    }
+    try {
+      this.db.exec(`ALTER TABLE ratings ADD COLUMN status TEXT DEFAULT 'pending'`);
+    } catch (e) {
+      // Column might already exist, ignore
+    }
+    try {
+      this.db.exec(`ALTER TABLE ratings ADD COLUMN rejectionReason TEXT`);
+    } catch (e) {
+      // Column might already exist, ignore
+    }
+    try {
+      this.db.exec(`ALTER TABLE ratings ADD COLUMN approvedBy TEXT`);
+    } catch (e) {
+      // Column might already exist, ignore
+    }
+    try {
+      this.db.exec(`ALTER TABLE ratings ADD COLUMN approvedAt TEXT`);
+    } catch (e) {
+      // Column might already exist, ignore
+    }
+    // Update existing ratings to approved status (for backward compatibility)
+    try {
+      this.db.exec(`UPDATE ratings SET status = 'approved' WHERE status IS NULL OR status = ''`);
+    } catch (e) {
+      // Ignore errors
+    }
 
     // Create indexes for ratings
     this.db.exec(`
@@ -278,6 +367,12 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
     `);
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_ratings_rating ON ratings(rating)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_ratings_status ON ratings(status)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_ratings_transaction_id ON ratings(transactionId)
     `);
   }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../src/components/layout/Layout.js';
 import { useAuth } from '../src/contexts/AuthContext';
@@ -17,6 +17,14 @@ function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [showRatingPrompt, setShowRatingPrompt] = useState(null); // { transactionId, bookId, bookTitle }
+  const [hasCheckedCompleted, setHasCheckedCompleted] = useState(false);
+  const allTransactionsRef = useRef(allTransactions);
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    allTransactionsRef.current = allTransactions;
+  }, [allTransactions]);
 
   const handleReturn = async (transactionId) => {
     try {
@@ -102,7 +110,20 @@ function TransactionsPage() {
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      alert('Return approved successfully! Book is now available.');
+      
+      // Find the transaction to get book info for rating prompt
+      const transaction = allTransactions.find(t => t.id === transactionId);
+      if (transaction && transaction.book && isMember(user)) {
+        // Show rating/review prompt for members
+        setShowRatingPrompt({
+          transactionId,
+          bookId: transaction.bookId,
+          bookTitle: transaction.book.title || 'this book',
+        });
+      } else {
+        alert('Return approved successfully! Book is now available.');
+      }
+      
       // Refresh transactions
       const url = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'librarian'
         ? `${API_BASE_URL}/transactions${bookId ? `?bookId=${bookId}` : ''}` 
@@ -232,41 +253,79 @@ function TransactionsPage() {
         }
       }, [user, authLoading, statusFilter, bookId]); // Added bookId to dependencies
 
-  if (authLoading || loading) {
-    return (
-      <Layout>
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (error) {
-    return (
-      <Layout>
-        <div className="py-6">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-red-50 border border-red-200 rounded-md p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">{error}</h3>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
+  // Check for recently completed transactions to show rating prompt
+  // This useEffect must ALWAYS run before any conditional returns (React hooks rule)
+  useEffect(() => {
+    // Only execute logic if conditions are met, but hook always runs
+    const isMemberUser = user && isMember(user);
+    const currentTransactions = allTransactionsRef.current;
+    const transactionsCount = currentTransactions.length;
+    const hasTransactions = transactionsCount > 0;
+    
+    if (isMemberUser && hasTransactions && !hasCheckedCompleted && !showRatingPrompt) {
+      const completedTransactions = currentTransactions.filter(t => 
+        t.status === 'completed' && 
+        t.type === 'borrow' &&
+        t.returnDate && 
+        new Date(t.returnDate).getTime() > Date.now() - 5 * 60 * 1000 // Completed in last 5 minutes
+      );
+      
+      if (completedTransactions.length > 0) {
+        const latest = completedTransactions[0];
+        if (latest.book) {
+          setShowRatingPrompt({
+            transactionId: latest.id,
+            bookId: latest.bookId,
+            bookTitle: latest.book.title || 'this book',
+          });
+          setHasCheckedCompleted(true);
+        } else {
+          setHasCheckedCompleted(true);
+        }
+      } else {
+        setHasCheckedCompleted(true);
+      }
+    }
+    // Reset check flag when transactions change significantly
+    if (!hasTransactions && hasCheckedCompleted) {
+      setHasCheckedCompleted(false);
+    }
+    // Use stable dependencies - only length and user id, not the full array
+  }, [allTransactions.length, user?.id, hasCheckedCompleted, showRatingPrompt]);
 
   return (
     <Layout>
+      {/* Rating/Review Prompt Modal */}
+      {showRatingPrompt && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Rate and Review "{showRatingPrompt.bookTitle}"
+            </h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Thank you for returning the book! Would you like to rate and review it now?
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  router.push(`/books/${showRatingPrompt.bookId}?rate=true&transactionId=${showRatingPrompt.transactionId}`);
+                  setShowRatingPrompt(null);
+                }}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+              >
+                Rate Now
+              </button>
+              <button
+                onClick={() => setShowRatingPrompt(null)}
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
+              >
+                Later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {bookId && (

@@ -46,6 +46,16 @@ const navigation = [
     roles: ['Admin', 'Librarian'], // Admin and Librarian
   },
   {
+    name: 'Pending Approvals',
+    href: '/admin/approvals',
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    roles: ['Admin'], // Admin only
+  },
+  {
     name: 'Settings',
     href: '/settings',
     icon: (
@@ -79,8 +89,12 @@ export default function Sidebar({ isOpen, onClose }) {
     if (!normalizedRole) {
       return false;
     }
-    // Check if user's role matches any of the item's allowed roles
-    return item.roles.includes(normalizedRole);
+    // Check if user's role matches any of the item's allowed roles (case-insensitive comparison)
+    const normalizedItemRoles = item.roles.map(role => {
+      const normalized = normalizeRole(role);
+      return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : role;
+    });
+    return normalizedItemRoles.includes(normalizedRole);
   });
 
   return (
