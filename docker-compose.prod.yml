@@ -10,11 +10,11 @@ services:
       args:
         - NODE_ENV=production
     ports:
-      - "3100:3000"
+      - "${LIBRARY_HOST_FRONTEND_PORT:-3300}:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:4000/api}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3301/api}
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
     dns:
@@ -39,7 +39,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "4000:4000"
+      - "${LIBRARY_HOST_BACKEND_PORT:-3301}:4000"
     volumes:
       - ./data:/app/data
       - backend_logs:/app/logs
@@ -48,7 +48,7 @@ services:
       - PORT=4000
       - SQLITE_PATH=/app/data/library.sqlite
       - JWT_SECRET=${JWT_SECRET}
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3100}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3300}
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}

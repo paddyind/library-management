@@ -43,7 +43,7 @@ A modern, full-stack library management system with **anonymous book browsing** 
 
 ### Prerequisites
 - Docker and Docker Compose installed
-- Ports 3100 (frontend) and 4000 (backend) available
+- Host ports **3300** (frontend) and **3301** (backend API) available for Docker Compose (see `.env.example` / `LIBRARY_HOST_*`)
 
 ### Installation
 
@@ -148,10 +148,10 @@ A modern, full-stack library management system with **anonymous book browsing** 
    docker compose up -d
    ```
 
-5. **Access the application**
-   - **Frontend**: http://localhost:3100
-   - **Backend API**: http://localhost:4000/api
-   - **Swagger API Docs**: http://localhost:4000/api-docs
+5. **Access the application** (Docker Compose host ports)
+   - **Frontend**: http://localhost:3300
+   - **Backend API**: http://localhost:3301/api
+   - **Swagger API Docs**: http://localhost:3301/api-docs
 
 6. **Create your first account**
    - Click "Register" on the welcome page
@@ -204,12 +204,12 @@ These routes require admin role and redirect non-admins to home page:
 - **[Architecture](ARCHITECTURE.md)** - System architecture and design decisions
 - **[Database](DATABASE.md)** - Database setup, schema, and management guide
 - **[Changelog](CHANGELOG.md)** - Version history and updates
-- **[API Documentation](http://localhost:4000/api-docs)** - Interactive Swagger/OpenAPI documentation (when server is running)
+- **[API Documentation](http://localhost:3301/api-docs)** - Interactive Swagger/OpenAPI documentation (when Docker Compose is running; use `3301` on the host)
 
 ### API Documentation
 
 The backend provides comprehensive API documentation via Swagger UI. After starting the application, visit:
-- **Swagger UI**: http://localhost:4000/api-docs
+- **Swagger UI**: http://localhost:3301/api-docs (Docker Compose) or http://localhost:4000/api-docs (local `npm` backend only)
 
 Features:
 - Interactive API explorer
@@ -298,6 +298,8 @@ library-management/
 ```
 
 ### Local Development
+
+Without Docker, the dev servers use **3000** (Next.js) and **4000** (API) on the host. Docker Compose instead publishes **3300** / **3301** so multiple projects can run together (see `observability-platform/docs/ARCHITECTURE.md`).
 
 **Frontend**
 ```bash

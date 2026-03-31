@@ -6,19 +6,24 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3100:3000"  # Map to Next.js default port
+      - "${LIBRARY_HOST_FRONTEND_PORT:-3300}:3000"
     environment:
       - NODE_ENV=development
       - PORT=3000
-      - NEXT_PUBLIC_API_URL=http://localhost:4000/api
+      - NEXT_PUBLIC_API_URL=http://localhost:${LIBRARY_HOST_BACKEND_PORT:-3301}/api
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - OTEL_SERVICE_NAME=library-management-frontend
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_RESOURCE_ATTRIBUTES=tenant.id=local-dev,service.namespace=library-management
     volumes:
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
     networks:
       - library-network
+      - obs-net
     container_name: library-management-frontend
     labels:
       - "com.docker.compose.project=library-management"
@@ -32,7 +37,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "4000:4000"
+      - "${LIBRARY_HOST_BACKEND_PORT:-3301}:4000"
     volumes:
       - ./backend/src:/app/src
       - ./backend/package.json:/app/package.json
@@ -43,14 +48,19 @@ services:
       - PORT=4000
       - SQLITE_PATH=/app/data/library.sqlite
       - JWT_SECRET=${JWT_SECRET:-development-secret-key}
-      - CORS_ORIGIN=http://localhost:3100
+      - CORS_ORIGIN=http://localhost:${LIBRARY_HOST_FRONTEND_PORT:-3300}
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD}
       - AUTH_STORAGE=${AUTH_STORAGE:-auto}
+      - OTEL_SERVICE_NAME=library-management-backend
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_RESOURCE_ATTRIBUTES=tenant.id=local-dev,service.namespace=library-management
     networks:
       - library-network
+      - obs-net
     container_name: library-management-backend
     labels:
       - "com.docker.compose.project=library-management"
@@ -65,3 +75,6 @@ services:
 networks:
   library-network:
     driver: bridge
+  obs-net:
+    external: true
+    name: obs_net
