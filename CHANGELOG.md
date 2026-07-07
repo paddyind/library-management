@@ -5,6 +5,32 @@ All notable changes to the Library Management System will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — v3.0.0 Platform Migration
+
+### Planned
+
+- **IAM:** Keycloak (OIDC, self-service registration) replacing custom JWT + Supabase Auth
+- **Data:** Firebase Firestore (SaaS, separate dev/prod projects) replacing Supabase Postgres + SQLite runtime
+- **Migration:** Import from `backend/backups/*.json` into Keycloak + Firestore; force password reset for imported users
+- **Transition:** `IAM_PROVIDER` / `DATA_STORAGE` feature flags; Supabase/SQLite remain fallback until Phase 6 cutover
+- **Documentation:** [TECH-MIGRATION.md](TECH-MIGRATION.md) master runbook; architecture banner in [ARCHITECTURE.md](ARCHITECTURE.md)
+
+### Phase 0 (completed)
+
+- Added `TECH-MIGRATION.md` with decisions, phased plan, Firebase dev/prod guidance, and decommission checklist
+- Updated `ARCHITECTURE.md`, `.env.example`, `README.md` with migration pointers
+- No runtime or Docker changes in Phase 0
+
+### Phase 1 (superseded by 1.5)
+
+- Keycloak was briefly embedded in library compose (port 3310); moved to workspace platform
+
+### Phase 1.5 (completed)
+
+- **`identity-platform`** repo: shared Keycloak on **3510**, realm-per-app, Firestore conventions
+- Library compose no longer runs Keycloak; canonical realm at `identity-platform/realms/library-realm.json`
+- Docs: `identity-platform/docs/ARCHITECTURE.md`, `DATA-PLATFORM.md`
+
 ## [2.0.1] - 2025-12-20
 
 ### Changed

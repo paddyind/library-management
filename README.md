@@ -6,7 +6,9 @@ A modern, full-stack library management system with **anonymous book browsing** 
 [![Frontend](https://img.shields.io/badge/frontend-100%25_complete-success.svg)](https://github.com/paddyind/library-management)
 [![Backend](https://img.shields.io/badge/backend-100%25_complete-success.svg)](https://github.com/paddyind/library-management)
 
-> **Latest Release (v1.0.10)**: Settings page reorganization with integrated Users, Groups, and Book Management tabs. Reviews and Ratings fully functional with dual-database support. See [CHANGELOG.md](CHANGELOG.md) for details.
+> **Latest Release (v2.0.1)**: Ratings/reviews workflow, dual-database support. See [CHANGELOG.md](CHANGELOG.md).
+>
+> **In progress (v3.0.0):** Migrating to **Keycloak** (IAM) + **Firebase Firestore** (data). Supabase/SQLite remain active until cutover. See **[TECH-MIGRATION.md](TECH-MIGRATION.md)**.
 
 ---
 
@@ -43,7 +45,7 @@ A modern, full-stack library management system with **anonymous book browsing** 
 
 ### Prerequisites
 - Docker and Docker Compose installed
-- Host ports **3300** (frontend) and **3301** (backend API) available for Docker Compose (see `.env.example` / `LIBRARY_HOST_*`)
+- Host ports **3300** (frontend), **3301** (backend API), and **3310** (Keycloak, optional for v3.0 migration) available — see `.env.example` / `LIBRARY_HOST_*`
 
 ### Installation
 
@@ -152,6 +154,7 @@ A modern, full-stack library management system with **anonymous book browsing** 
    - **Frontend**: http://localhost:3300
    - **Backend API**: http://localhost:3301/api
    - **Swagger API Docs**: http://localhost:3301/api-docs
+   - **Keycloak** (workspace IAM): http://localhost:3510 — see [identity-platform](../identity-platform/README.md)
 
 6. **Create your first account**
    - Click "Register" on the welcome page
@@ -159,6 +162,21 @@ A modern, full-stack library management system with **anonymous book browsing** 
    - Start browsing and borrowing books!
 
 > **Note**: The application will automatically use SQLite database for user authentication if Supabase is not configured or unavailable. Users are stored persistently in the SQLite database located at `data/library.sqlite`.
+
+### Keycloak (v3.0 migration — workspace identity-platform)
+
+Legacy app login is unchanged. Shared IAM for all My Projects apps:
+
+```bash
+cd ../identity-platform && docker compose up -d
+```
+
+| Item | URL |
+|------|-----|
+| Admin console | http://localhost:3510 |
+| Library realm | http://localhost:3510/realms/library |
+
+Docs: **[identity-platform/docs/ARCHITECTURE.md](../identity-platform/docs/ARCHITECTURE.md)** · Library phases: **[TECH-MIGRATION.md](TECH-MIGRATION.md)**
 
 ---
 
@@ -201,6 +219,7 @@ These routes require admin role and redirect non-admins to home page:
 
 ## 📚 Documentation
 
+- **[Technical Migration](TECH-MIGRATION.md)** - v3.0.0 Keycloak + Firebase migration runbook (in progress)
 - **[Architecture](ARCHITECTURE.md)** - System architecture and design decisions
 - **[Database](DATABASE.md)** - Database setup, schema, and management guide
 - **[Changelog](CHANGELOG.md)** - Version history and updates

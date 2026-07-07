@@ -48,6 +48,9 @@ Thumbs.db
 data/
 postgres-data/
 
+# Migration secrets (Firebase service accounts, etc.)
+secrets/
+
 # TypeScript
 *.tsbuildinfo
 

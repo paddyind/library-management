@@ -1,8 +1,25 @@
 # Architecture Documentation
 
+> **Platform migration in progress (v3.0.0):** The current runtime is **Supabase/SQLite + custom JWT**. The target is **Keycloak (OIDC) + Firebase Firestore**. Supabase remains the fallback until explicit cutover. See **[TECH-MIGRATION.md](TECH-MIGRATION.md)** for phases, decisions, and runbook.
+
 ## System Overview
 
 The Library Management System is a full-stack application built with modern web technologies, supporting both Supabase (PostgreSQL) and SQLite databases with automatic fallback.
+
+### Target architecture (v3.0.0 — planned)
+
+```
+Next.js :3300  ──OIDC──►  identity-platform Keycloak :3510  (realm: library)
+      │
+      └── Bearer token ──►  NestJS :3301  ──►  Firestore personal-apps-dev (library__*)
+```
+
+- **IAM:** Workspace [identity-platform](../identity-platform) — realm `library`, port **3510**
+- **Data:** Shared Firebase project + `library__*` collection prefix — see [DATA-PLATFORM.md](../identity-platform/docs/DATA-PLATFORM.md)
+- **API:** NestJS validates Keycloak JWT via JWKS; Firebase Admin SDK for data
+- **Transition:** Feature flags `IAM_PROVIDER` and `DATA_STORAGE` (`legacy` until cutover)
+
+Full details: [TECH-MIGRATION.md](TECH-MIGRATION.md).
 
 ## Technology Stack
 
