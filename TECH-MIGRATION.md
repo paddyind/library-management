@@ -23,7 +23,7 @@
 
 **Last updated:** 2026-06-05 — Phase 1.5 complete; identity-platform repo; pause before Phase 2
 
-> **Resume here:** [identity-platform/STATUS.md](../identity-platform/STATUS.md) · Phase 2 prerequisites below
+> **Resume here:** [identity-platform/STATUS.md](../identity-platform/STATUS.md) · [SETUP-VALIDATION.md](../identity-platform/docs/SETUP-VALIDATION.md)
 
 ---
 
@@ -165,10 +165,17 @@ Full conventions, cost, campus-circle hybrid, recreate: **[identity-platform/doc
 
 ### Setup checklist (before Phase 2)
 
-1. Create Firebase project **`personal-apps-dev`**.
-2. Enable Firestore (e.g. `asia-south1`, production mode).
-3. Service account → `identity-platform/secrets/firebase-dev.json`.
-4. Library `.env`: `FIREBASE_PROJECT_ID=personal-apps-dev`, `APP_FIRESTORE_PREFIX=library`.
+| Step | Item | Status (2026-07-08) |
+|------|------|---------------------|
+| A1–A5 | Keycloak running, realm `library`, default `member` role | ✅ Verified |
+| A6–A8 | Test user / token (optional) | ✅ User exists; token test manual |
+| B1 | Firebase project `personal-apps-dev` | ✅ |
+| B2 | Firestore enabled in console | ⏳ **You confirm in console** |
+| B3 | Service account → `identity-platform/secrets/firebase-dev.json` | ✅ |
+| B4 | Library `.env` + Docker mount | ✅ |
+| B7 | Publish `firestore.rules` in console | ⏳ **Manual** |
+
+Full commands: [identity-platform/docs/SETUP-VALIDATION.md](../identity-platform/docs/SETUP-VALIDATION.md)
 
 ---
 

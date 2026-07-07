@@ -43,6 +43,8 @@ services:
       - ./backend/package.json:/app/package.json
       - ./data:/app/data
       - /app/node_modules  # Prevent host node_modules from overriding container's compiled modules
+      - ../identity-platform/secrets/firebase-dev.json:/app/secrets/firebase-dev.json:ro
+
     environment:
       - NODE_ENV=development
       - PORT=4000
@@ -54,6 +56,11 @@ services:
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD}
       - AUTH_STORAGE=${AUTH_STORAGE:-auto}
+      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://host.docker.internal:3510}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-library}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-}
+      - APP_FIRESTORE_PREFIX=${APP_FIRESTORE_PREFIX:-library}
+      - GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS:-/app/secrets/firebase-dev.json}
       - OTEL_SERVICE_NAME=library-management-backend
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
