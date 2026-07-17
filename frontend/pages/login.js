@@ -177,7 +177,7 @@ export default function Login() {
 
           <p className="text-center text-sm text-gray-600">
             <Link href="/" className="font-medium text-primary-600 hover:text-primary-500">
-              Browse books without signing in
+              Cancel and browse without signing in
             </Link>
           </p>
         </div>

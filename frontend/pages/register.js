@@ -54,6 +54,10 @@ export default function Register() {
           <p className="text-gray-600">Redirecting to Keycloak to create your account…</p>
         )}
         <p className="text-sm">
+          <Link href="/" className="text-primary-600 hover:text-primary-500">
+            Cancel and return home
+          </Link>
+          {' · '}
           <Link href="/login" className="text-primary-600 hover:text-primary-500">
             Back to sign in
           </Link>
