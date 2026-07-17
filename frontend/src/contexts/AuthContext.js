@@ -1,6 +1,14 @@
-import { useState, useEffect, useContext, createContext, useCallback } from 'react';
+import { useState, useEffect, useContext, createContext, useCallback, useRef } from 'react';
 import axios from 'axios';
-import { getKeycloak, getKeycloakRegisterUrl, isKeycloakMode } from '../lib/keycloak';
+import {
+  consumePostLoginRedirect,
+  getKeycloak,
+  initKeycloak,
+  isKeycloakMode,
+  loginWithKeycloak as startKeycloakLogin,
+  logoutFromKeycloak,
+  registerWithKeycloak as startKeycloakRegister,
+} from '../lib/keycloak';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -9,61 +17,77 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
   const keycloakMode = isKeycloakMode();
+  const refreshTimer = useRef(null);
+
+  const clearSession = useCallback(() => {
+    localStorage.removeItem('token');
+    setUser(null);
+    if (refreshTimer.current) {
+      clearInterval(refreshTimer.current);
+      refreshTimer.current = null;
+    }
+  }, []);
 
   const fetchProfile = useCallback(async (token) => {
     const response = await axios.get(`${API_BASE_URL}/profile`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     setUser(response.data);
+    setAuthError(null);
     return response.data;
   }, []);
 
-  const persistToken = (token) => {
-    localStorage.setItem('token', token);
-  };
+  const persistToken = useCallback((token) => {
+    if (token) localStorage.setItem('token', token);
+  }, []);
 
-  const clearSession = () => {
-    localStorage.removeItem('token');
-    setUser(null);
-  };
+  const setupTokenRefresh = useCallback((keycloak) => {
+    if (refreshTimer.current) clearInterval(refreshTimer.current);
+    refreshTimer.current = setInterval(async () => {
+      try {
+        const refreshed = await keycloak.updateToken(30);
+        if (refreshed && keycloak.token) {
+          persistToken(keycloak.token);
+        }
+      } catch {
+        clearSession();
+      }
+    }, 20_000);
+  }, [clearSession, persistToken]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function bootstrap() {
       if (keycloakMode) {
-        const keycloak = getKeycloak();
-        if (!keycloak) {
-          setLoading(false);
-          return;
-        }
-
         try {
-          const authenticated = await keycloak.init({
-            onLoad: 'check-sso',
-            pkceMethod: 'S256',
-            checkLoginIframe: false,
-          });
-
+          const { authenticated, keycloak } = await initKeycloak();
           if (cancelled) return;
 
-          if (authenticated && keycloak.token) {
+          if (authenticated && keycloak?.token) {
             persistToken(keycloak.token);
-            await fetchProfile(keycloak.token);
-          } else {
-            const saved = localStorage.getItem('token');
-            if (saved) {
-              try {
-                await fetchProfile(saved);
-              } catch {
-                clearSession();
-              }
+            setupTokenRefresh(keycloak);
+            try {
+              await fetchProfile(keycloak.token);
+            } catch (profileError) {
+              console.error('Profile fetch after Keycloak auth failed:', profileError.message);
+              setAuthError(
+                profileError.response?.data?.message ||
+                  'Signed in with Keycloak, but your library profile could not be loaded. Try again or contact support.',
+              );
+              // Keep Keycloak session; user may retry profile
             }
+          } else {
+            clearSession();
           }
         } catch (error) {
-          console.error('Keycloak init failed:', error.message);
-          clearSession();
+          console.error('Keycloak init failed:', error?.message || error);
+          if (!cancelled) {
+            clearSession();
+            setAuthError('Could not reach the sign-in service. Confirm identity-platform is running on port 3510.');
+          }
         } finally {
           if (!cancelled) setLoading(false);
         }
@@ -77,15 +101,11 @@ export const AuthProvider = ({ children }) => {
         } catch (error) {
           const errorCode = error.response?.data?.code;
           const errorMessage = error.response?.data?.message || '';
-
+          clearSession();
           if (errorCode === 'PROFILE_MISSING' || errorMessage.includes('profile is missing')) {
-            clearSession();
             if (typeof window !== 'undefined') {
-              const message = errorMessage || 'Your account profile is missing. Please contact support.';
-              window.location.href = `/login?error=${encodeURIComponent('PROFILE_MISSING')}&message=${encodeURIComponent(message)}`;
+              window.location.href = `/login?error=${encodeURIComponent('PROFILE_MISSING')}&message=${encodeURIComponent(errorMessage || 'Your account profile is missing.')}`;
             }
-          } else {
-            clearSession();
           }
         }
       }
@@ -95,15 +115,13 @@ export const AuthProvider = ({ children }) => {
     bootstrap();
     return () => {
       cancelled = true;
+      if (refreshTimer.current) clearInterval(refreshTimer.current);
     };
-  }, [keycloakMode, fetchProfile]);
+  }, [keycloakMode, fetchProfile, persistToken, clearSession, setupTokenRefresh]);
 
   const login = async (email, password) => {
     if (keycloakMode) {
-      const keycloak = getKeycloak();
-      await keycloak.login({
-        redirectUri: `${window.location.origin}/dashboard`,
-      });
+      await startKeycloakLogin('/dashboard');
       return null;
     }
 
@@ -115,22 +133,24 @@ export const AuthProvider = ({ children }) => {
       const profile = await fetchProfile(access_token);
       return { ...response.data, user: profile };
     } catch (error) {
-      console.warn('Failed to fetch profile after login, using login response data:', error.message);
       setUser(userData);
       return response.data;
     }
   };
 
   const loginWithKeycloak = async (redirectPath = '/dashboard') => {
-    const keycloak = getKeycloak();
-    await keycloak.login({
-      redirectUri: `${window.location.origin}${redirectPath}`,
-    });
+    setAuthError(null);
+    await startKeycloakLogin(redirectPath);
+  };
+
+  const registerWithKeycloak = async (redirectPath = '/dashboard', options = {}) => {
+    setAuthError(null);
+    await startKeycloakRegister(redirectPath, options);
   };
 
   const signUp = async (userData) => {
     if (keycloakMode) {
-      window.location.href = getKeycloakRegisterUrl();
+      await startKeycloakRegister('/dashboard');
       return { data: null, error: null };
     }
 
@@ -153,9 +173,8 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     if (keycloakMode) {
-      const keycloak = getKeycloak();
       clearSession();
-      await keycloak.logout({ redirectUri: `${window.location.origin}/` });
+      await logoutFromKeycloak();
       return;
     }
     clearSession();
@@ -169,15 +188,21 @@ export const AuthProvider = ({ children }) => {
     return localStorage.getItem('token');
   };
 
+  const finishKeycloakRedirect = useCallback(() => consumePostLoginRedirect('/dashboard'), []);
+
   const value = {
     user,
     loading,
+    authError,
+    setAuthError,
     login,
     loginWithKeycloak,
+    registerWithKeycloak,
     signUp,
     logout,
     getAccessToken,
     keycloakMode,
+    finishKeycloakRedirect,
   };
 
   return (

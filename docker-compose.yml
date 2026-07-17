@@ -58,7 +58,10 @@ services:
       - CORS_ORIGIN=http://localhost:${LIBRARY_HOST_FRONTEND_PORT:-3300}
       - IAM_PROVIDER=${IAM_PROVIDER:-legacy}
       - DATA_STORAGE=${DATA_STORAGE:-legacy}
+      # JWKS fetch from Docker → host Keycloak
       - KEYCLOAK_URL=${KEYCLOAK_INTERNAL_URL:-http://host.docker.internal:3510}
+      # JWT iss claim must match browser-facing Keycloak (localhost, not host.docker.internal)
+      - KEYCLOAK_PUBLIC_URL=${KEYCLOAK_PUBLIC_URL:-http://localhost:3510}
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-library}
       - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
