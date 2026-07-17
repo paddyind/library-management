@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { SubscriptionsController } from './subscriptions.controller';
 import { SubscriptionsService } from './subscriptions.service';
-import { SupabaseModule } from '../config/supabase.module';
+import { SqliteModule } from '../config/sqlite.module';
 
 @Module({
-  imports: [SupabaseModule],
+  imports: [SqliteModule],
   controllers: [SubscriptionsController],
   providers: [SubscriptionsService],
   exports: [SubscriptionsService],

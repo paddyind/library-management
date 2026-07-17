@@ -1,553 +1,62 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SupabaseService } from '../config/supabase.service';
+import { randomUUID } from 'crypto';
 import { SqliteService } from '../config/sqlite.service';
+import { FirestoreService } from '../config/firestore.service';
+import { usesFirebase } from '../config/storage.util';
 import { CreateGroupDto, UpdateGroupDto } from '../dto/create-group.dto';
 import { Group } from './group.interface';
 import { Member } from '../members/member.interface';
 
 @Injectable()
 export class GroupsService {
-  constructor(
-    private readonly supabaseService: SupabaseService,
-    private readonly sqliteService: SqliteService,
-    private readonly configService: ConfigService,
-  ) {}
-
-  private getPreferredStorage(): 'supabase' | 'sqlite' {
-    const authStorage = this.configService.get<string>('AUTH_STORAGE', 'auto');
-    
-    if (authStorage === 'sqlite') {
-      return 'sqlite';
-    }
-    
-    if (authStorage === 'supabase') {
-      return 'supabase';
-    }
-
-    // Auto-detect: prefer Supabase if configured and available
-    try {
-      const supabaseClient = this.supabaseService.getClient();
-      if (supabaseClient) {
-        return 'supabase';
-      }
-    } catch (error) {
-      // Supabase not available, fallback to SQLite
-    }
-
-    // Default to SQLite if available
-    return this.sqliteService.isReady() ? 'sqlite' : 'supabase';
-  }
-
+  constructor(private readonly sqliteService: SqliteService, private readonly firestoreService: FirestoreService, private readonly configService: ConfigService) {}
+  private getPreferredStorage(): 'sqlite' { return 'sqlite'; }
+  private usesFirebase(): boolean { return usesFirebase(this.configService, this.firestoreService); }
   async findAll(): Promise<any[]> {
-    const storage = this.getPreferredStorage();
-
-    if (storage === 'supabase') {
-      try {
-        // Get all groups first
-        const { data: groupsData, error: groupsError } = await this.supabaseService
-          .getClient()
-          .from('groups')
-          .select('*')
-          .order('id');
-        
-        console.log(`📊 Found ${groupsData?.length || 0} groups in Supabase`);
-        if (groupsData && groupsData.length > 0) {
-          console.log(`   Group IDs and types: ${groupsData.map((g: any) => `${g.name} (ID: ${g.id}, type: ${typeof g.id})`).join(', ')}`);
-        }
-
-        if (groupsError) {
-          // Only log if it's not a timeout (expected when Supabase is unavailable)
-          if (!groupsError.message?.includes('TIMEOUT')) {
-            console.warn('⚠️ Supabase groups query error, falling back to SQLite:', groupsError.message);
-          }
-          return this.sqliteFindAll();
-        }
-
-        // For each group, get member count
-        const groupsWithCounts = await Promise.all(
-          (groupsData || []).map(async (group: any) => {
-            try {
-              // Log the query details for debugging
-              console.log(`🔍 Querying group_members for group_id=${group.id} (type: ${typeof group.id}, name: ${group.name})`);
-              
-              // Ensure group.id is treated as integer (Supabase groups.id is SERIAL/INTEGER)
-              // group_id in group_members is INTEGER, so we need to match types
-              const groupIdValue = typeof group.id === 'string' ? parseInt(group.id, 10) : Number(group.id);
-              
-              // Fetch actual records to count (more reliable than count query)
-              const { data: membersData, error: membersError } = await this.supabaseService
-                .getClient()
-                .from('group_members')
-                .select('group_id, member_id')
-                .eq('group_id', groupIdValue);
-              
-              // Debug: Check if there's any data in group_members at all
-              if (!membersData || membersData.length === 0) {
-                console.log(`   🔍 No members found with group_id=${groupIdValue}, checking all group_members...`);
-                const { data: allMembers, error: allError } = await this.supabaseService
-                  .getClient()
-                  .from('group_members')
-                  .select('group_id, member_id')
-                  .limit(10);
-                if (!allError && allMembers) {
-                  console.log(`   📋 Sample group_members data: ${JSON.stringify(allMembers)}`);
-                  console.log(`   🔍 Checking if any match group_id=${groupIdValue} (comparing types: ${allMembers.map((m: any) => typeof m.group_id).join(', ')})`);
-                }
-              }
-
-              if (membersError) {
-                console.warn(`⚠️ Error querying group_members for group ${group.id} (${group.name}):`, membersError.message, membersError.code);
-                return {
-                  ...group,
-                  memberCount: 0,
-                };
-              }
-
-              // Use actual data length instead of count query (more reliable)
-              const memberCount = membersData?.length || 0;
-              console.log(`✅ Group ${group.name} (ID: ${group.id}) has ${memberCount} members${memberCount > 0 ? `: ${JSON.stringify(membersData.map((m: any) => ({ group_id: m.group_id, member_id: m.member_id })))}` : ''}`);
-              
-              return {
-                ...group,
-                memberCount: memberCount,
-              };
-            } catch (error: any) {
-              console.error(`❌ Exception getting member count for group ${group.id}:`, error.message, error.stack);
-              return {
-                ...group,
-                memberCount: 0,
-              };
-            }
-          })
-        );
-
-        return groupsWithCounts;
-      } catch (error: any) {
-        // Only log if it's not a timeout (expected when Supabase is unavailable)
-        if (!error.message?.includes('TIMEOUT') && error.code !== 'ETIMEDOUT') {
-          console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
-        }
-        return this.sqliteFindAll();
-      }
+    if (this.usesFirebase()) {
+      const [groups, members] = await Promise.all([this.firestoreService.collection('groups').get(), this.firestoreService.collection('groupMembers').get()]);
+      return groups.docs.map(doc => ({ ...this.firestoreService.docToData<any>(doc), memberCount: members.docs.filter(member => member.data().groupId === doc.id).length }));
     }
-
-    return this.sqliteFindAll();
-  }
-
-  private sqliteFindAll(): any[] {
-    if (!this.sqliteService.isReady()) {
-      return [];
-    }
-
-    try {
-      const db = this.sqliteService.getDatabase();
-      const groups = db.prepare('SELECT * FROM groups ORDER BY name').all() as any[];
-      
-      // Get member count for each group
-      return groups.map(group => {
-        try {
-          const memberCountResult = db.prepare('SELECT COUNT(*) as count FROM group_members WHERE group_id = ?')
-            .get(group.id) as any;
-          const memberCount = memberCountResult?.count || 0;
-          
-          // Parse permissions if it's a JSON string
-          let permissions = [];
-          try {
-            if (typeof group.permissions === 'string' && group.permissions) {
-              permissions = JSON.parse(group.permissions);
-            } else if (Array.isArray(group.permissions)) {
-              permissions = group.permissions;
-            }
-          } catch (e) {
-            permissions = [];
-          }
-          
-          return {
-            ...group,
-            permissions: permissions,
-            memberCount: memberCount,
-          };
-        } catch (error: any) {
-          console.warn(`⚠️ Error processing group ${group.id}:`, error.message);
-          return {
-            ...group,
-            permissions: [],
-            memberCount: 0,
-          };
-        }
-      });
-    } catch (error: any) {
-      console.warn('⚠️ SQLite groups query error:', error.message);
-      return [];
-    }
-  }
-
-  async findOne(id: number): Promise<Group> {
-    const storage = this.getPreferredStorage();
-
-    if (storage === 'supabase') {
-      try {
-        const { data, error } = await this.supabaseService
-          .getClient()
-          .from('groups')
-          .select('*, members:members(*)')
-          .eq('id', id)
-          .single();
-
-        if (error) {
-          if (error.code === 'PGRST116') {
-            throw new NotFoundException(`Group with ID "${id}" not found`);
-          }
-          console.warn('⚠️ Supabase group query error, falling back to SQLite:', error.message);
-          return this.sqliteFindOne(id);
-        }
-
-        return data;
-      } catch (error: any) {
-        if (error instanceof NotFoundException) {
-          throw error;
-        }
-        console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
-        return this.sqliteFindOne(id);
-      }
-    }
-
-    return this.sqliteFindOne(id);
-  }
-
-  private sqliteFindOne(id: number): Group {
-    if (!this.sqliteService.isReady()) {
-      throw new NotFoundException(`Group with ID "${id}" not found`);
-    }
-
+    if (!this.sqliteService.isReady()) return [];
     const db = this.sqliteService.getDatabase();
-    const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(id) as any;
-    
-    if (!group) {
-      throw new NotFoundException(`Group with ID "${id}" not found`);
-    }
-
-    const members = db.prepare('SELECT * FROM group_members WHERE group_id = ?').all(id) as any[];
-    return {
-      ...group,
-      members: members,
-    };
+    return (db.prepare('SELECT * FROM groups ORDER BY name').all() as any[]).map(group => ({ ...group, permissions: this.permissions(group.permissions), memberCount: (db.prepare('SELECT COUNT(*) count FROM group_members WHERE group_id = ?').get(group.id) as any).count }));
   }
-
-  async create(createGroupDto: CreateGroupDto): Promise<Group> {
-    const storage = this.getPreferredStorage();
-
-    if (storage === 'supabase') {
-      try {
-        const { data, error } = await this.supabaseService
-          .getClient()
-          .from('groups')
-          .insert([createGroupDto])
-          .select()
-          .single();
-
-        if (error) {
-          if (error.code === '23505') { // unique_violation
-            throw new ConflictException(`Group with name "${createGroupDto.name}" already exists`);
-          }
-          console.warn('⚠️ Supabase group create error, falling back to SQLite:', error.message);
-          return this.sqliteCreate(createGroupDto);
-        }
-
-        return data;
-      } catch (error: any) {
-        if (error instanceof ConflictException) {
-          throw error;
-        }
-        console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
-        return this.sqliteCreate(createGroupDto);
-      }
+  async findOne(id: any): Promise<Group> {
+    if (this.usesFirebase()) {
+      const doc = await this.firestoreService.collection('groups').doc(String(id)).get();
+      if (!doc.exists) throw new NotFoundException(`Group with ID "${id}" not found`);
+      const members = await this.firestoreService.collection('groupMembers').where('groupId', '==', String(id)).get();
+      return { ...(this.firestoreService.docToData<any>(doc)), members: members.docs.map(m => ({ id: m.id, ...m.data() })) } as Group;
     }
-
-    return this.sqliteCreate(createGroupDto);
+    const group = this.sqliteService.getDatabase().prepare('SELECT * FROM groups WHERE id = ?').get(id) as any;
+    if (!group) throw new NotFoundException(`Group with ID "${id}" not found`);
+    return { ...group, permissions: this.permissions(group.permissions), members: this.sqliteService.getDatabase().prepare('SELECT * FROM group_members WHERE group_id = ?').all(id) } as Group;
   }
-
-  private sqliteCreate(createGroupDto: CreateGroupDto): Group {
-    if (!this.sqliteService.isReady()) {
-      throw new Error('SQLite database is not initialized');
+  async create(dto: CreateGroupDto): Promise<Group> {
+    if (this.usesFirebase()) {
+      const id = randomUUID(), now = new Date();
+      await this.firestoreService.collection('groups').doc(id).set({ ...dto, description: dto.description ?? '', permissions: dto.permissions ?? [], createdBy: '', createdAt: now, updatedAt: now });
+      return this.findOne(id);
     }
-
-    const db = this.sqliteService.getDatabase();
-    const id = Date.now(); // Simple ID generation for SQLite
-    
-    try {
-      db.prepare(`
-        INSERT INTO groups (id, name, description, permissions, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(
-        id,
-        createGroupDto.name,
-        createGroupDto.description || '',
-        JSON.stringify(createGroupDto.permissions || []),
-        new Date().toISOString(),
-        new Date().toISOString(),
-      );
-
-      return this.sqliteFindOne(id);
-    } catch (error: any) {
-      if (error.message?.includes('UNIQUE constraint failed')) {
-        throw new ConflictException(`Group with name "${createGroupDto.name}" already exists`);
-      }
-      throw error;
-    }
+    const db = this.sqliteService.getDatabase(), id = Date.now();
+    try { db.prepare('INSERT INTO groups (id, name, description, permissions, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)').run(id, dto.name, dto.description ?? '', JSON.stringify(dto.permissions ?? []), new Date().toISOString(), new Date().toISOString()); }
+    catch (error: any) { if (error.message.includes('UNIQUE')) throw new ConflictException(`Group with name "${dto.name}" already exists`); throw error; }
+    return this.findOne(id);
   }
-
-  async update(id: number, updateGroupDto: UpdateGroupDto): Promise<Group> {
-    const storage = this.getPreferredStorage();
-
-    if (storage === 'supabase') {
-      try {
-        const { data, error } = await this.supabaseService
-          .getClient()
-          .from('groups')
-          .update(updateGroupDto)
-          .eq('id', id)
-          .select()
-          .single();
-
-        if (error) {
-          if (error.code === '23505') { // unique_violation
-            throw new ConflictException(`Group with name "${updateGroupDto.name}" already exists`);
-          }
-          if (error.code === 'PGRST116') {
-            throw new NotFoundException(`Group with ID "${id}" not found`);
-          }
-          console.warn('⚠️ Supabase group update error, falling back to SQLite:', error.message);
-          return this.sqliteUpdate(id, updateGroupDto);
-        }
-
-        return data;
-      } catch (error: any) {
-        if (error instanceof NotFoundException || error instanceof ConflictException) {
-          throw error;
-        }
-        console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
-        return this.sqliteUpdate(id, updateGroupDto);
-      }
-    }
-
-    return this.sqliteUpdate(id, updateGroupDto);
+  async update(id: any, dto: UpdateGroupDto): Promise<Group> {
+    if (this.usesFirebase()) { const ref = this.firestoreService.collection('groups').doc(String(id)); if (!(await ref.get()).exists) throw new NotFoundException(`Group with ID "${id}" not found`); await ref.update({ ...dto, updatedAt: new Date() }); return this.findOne(id); }
+    const db = this.sqliteService.getDatabase(), fields = Object.entries(dto).filter(([, v]) => v !== undefined);
+    if (!fields.length) return this.findOne(id);
+    try { db.prepare(`UPDATE groups SET ${fields.map(([k]) => `${k} = ?`).join(', ')}, updated_at = ? WHERE id = ?`).run(...fields.map(([k, v]) => k === 'permissions' ? JSON.stringify(v) : v), new Date().toISOString(), id); return this.findOne(id); }
+    catch (error: any) { if (error.message.includes('UNIQUE')) throw new ConflictException(`Group with name "${dto.name}" already exists`); throw new NotFoundException(`Group with ID "${id}" not found`); }
   }
-
-  private sqliteUpdate(id: number, updateGroupDto: UpdateGroupDto): Group {
-    if (!this.sqliteService.isReady()) {
-      throw new NotFoundException(`Group with ID "${id}" not found`);
-    }
-
-    const db = this.sqliteService.getDatabase();
-    
-    try {
-      const updates: string[] = [];
-      const values: any[] = [];
-
-      if (updateGroupDto.name !== undefined) {
-        updates.push('name = ?');
-        values.push(updateGroupDto.name);
-      }
-      if (updateGroupDto.description !== undefined) {
-        updates.push('description = ?');
-        values.push(updateGroupDto.description);
-      }
-      if (updateGroupDto.permissions !== undefined) {
-        updates.push('permissions = ?');
-        values.push(JSON.stringify(updateGroupDto.permissions));
-      }
-      updates.push('updated_at = ?');
-      values.push(new Date().toISOString());
-      values.push(id);
-
-      db.prepare(`UPDATE groups SET ${updates.join(', ')} WHERE id = ?`).run(...values);
-
-      return this.sqliteFindOne(id);
-    } catch (error: any) {
-      if (error.message?.includes('UNIQUE constraint failed')) {
-        throw new ConflictException(`Group with name "${updateGroupDto.name}" already exists`);
-      }
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      throw new NotFoundException(`Group with ID "${id}" not found`);
-    }
+  async remove(id: any): Promise<void> { if (this.usesFirebase()) { await this.firestoreService.collection('groups').doc(String(id)).delete(); return; } if (!this.sqliteService.getDatabase().prepare('DELETE FROM groups WHERE id = ?').run(id).changes) throw new NotFoundException(`Group with ID "${id}" not found`); }
+  async addMember(groupId: any, memberId: string): Promise<void> {
+    if (this.usesFirebase()) { const existing = await this.firestoreService.collection('groupMembers').where('groupId', '==', String(groupId)).where('memberId', '==', memberId).limit(1).get(); if (!existing.empty) throw new ConflictException('Member is already a member of this group'); await this.firestoreService.collection('groupMembers').doc(randomUUID()).set({ groupId: String(groupId), memberId, role: 'member', joinedAt: new Date() }); return; }
+    try { this.sqliteService.getDatabase().prepare('INSERT INTO group_members (group_id, member_id) VALUES (?, ?)').run(groupId, memberId); } catch (error: any) { if (error.message.includes('UNIQUE')) throw new ConflictException('Member is already a member of this group'); throw error; }
   }
-
-  async remove(id: number): Promise<void> {
-    const storage = this.getPreferredStorage();
-
-    if (storage === 'supabase') {
-      try {
-        const { error } = await this.supabaseService.getClient().from('groups').delete().eq('id', id);
-
-        if (error) {
-          if (error.code === 'PGRST116') {
-            throw new NotFoundException(`Group with ID "${id}" not found`);
-          }
-          console.warn('⚠️ Supabase group delete error, falling back to SQLite:', error.message);
-          return this.sqliteRemove(id);
-        }
-      } catch (error: any) {
-        if (error instanceof NotFoundException) {
-          throw error;
-        }
-        console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
-        return this.sqliteRemove(id);
-      }
-    } else {
-      return this.sqliteRemove(id);
-    }
-  }
-
-  private sqliteRemove(id: number): void {
-    if (!this.sqliteService.isReady()) {
-      throw new NotFoundException(`Group with ID "${id}" not found`);
-    }
-
-    const db = this.sqliteService.getDatabase();
-    const result = db.prepare('DELETE FROM groups WHERE id = ?').run(id);
-    
-    if (result.changes === 0) {
-      throw new NotFoundException(`Group with ID "${id}" not found`);
-    }
-  }
-
-  async addMember(groupId: number, memberId: string): Promise<void> {
-    const storage = this.getPreferredStorage();
-
-    if (storage === 'supabase') {
-      try {
-        const { error } = await this.supabaseService
-          .getClient()
-          .from('group_members')
-          .insert([{ group_id: groupId, member_id: memberId }]);
-
-        if (error) {
-          if (error.code === '23505') { // unique_violation
-            throw new ConflictException(`Member is already a member of this group`);
-          }
-          console.warn('⚠️ Supabase add member error, falling back to SQLite:', error.message);
-          return this.sqliteAddMember(groupId, memberId);
-        }
-      } catch (error: any) {
-        if (error instanceof ConflictException) {
-          throw error;
-        }
-        console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
-        return this.sqliteAddMember(groupId, memberId);
-      }
-    } else {
-      return this.sqliteAddMember(groupId, memberId);
-    }
-  }
-
-  private sqliteAddMember(groupId: number, memberId: string): void {
-    if (!this.sqliteService.isReady()) {
-      throw new Error('SQLite database is not initialized');
-    }
-
-    const db = this.sqliteService.getDatabase();
-    
-    try {
-      db.prepare('INSERT INTO group_members (group_id, member_id) VALUES (?, ?)')
-        .run(groupId, memberId);
-    } catch (error: any) {
-      if (error.message?.includes('UNIQUE constraint failed')) {
-        throw new ConflictException(`Member is already a member of this group`);
-      }
-      throw error;
-    }
-  }
-
-  async removeMember(groupId: number, memberId: string): Promise<void> {
-    const storage = this.getPreferredStorage();
-
-    if (storage === 'supabase') {
-      try {
-        const { error } = await this.supabaseService
-          .getClient()
-          .from('group_members')
-          .delete()
-          .eq('group_id', groupId)
-          .eq('member_id', memberId);
-
-        if (error) {
-          console.warn('⚠️ Supabase remove member error, falling back to SQLite:', error.message);
-          return this.sqliteRemoveMember(groupId, memberId);
-        }
-      } catch (error: any) {
-        console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
-        return this.sqliteRemoveMember(groupId, memberId);
-      }
-    } else {
-      return this.sqliteRemoveMember(groupId, memberId);
-    }
-  }
-
-  private sqliteRemoveMember(groupId: number, memberId: string): void {
-    if (!this.sqliteService.isReady()) {
-      throw new Error('SQLite database is not initialized');
-    }
-
-    const db = this.sqliteService.getDatabase();
-    db.prepare('DELETE FROM group_members WHERE group_id = ? AND member_id = ?')
-      .run(groupId, memberId);
-  }
-
-  async getMembers(groupId: number): Promise<Member[]> {
-    const storage = this.getPreferredStorage();
-
-    if (storage === 'supabase') {
-      try {
-        const { data, error } = await this.supabaseService
-          .getClient()
-          .from('users')
-          .select('*, group_members!inner(group_id)')
-          .eq('group_members.group_id', groupId);
-
-        if (error) {
-          console.warn('⚠️ Supabase get members error, falling back to SQLite:', error.message);
-          return this.sqliteGetMembers(groupId);
-        }
-
-        return data;
-      } catch (error: any) {
-        console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
-        return this.sqliteGetMembers(groupId);
-      }
-    }
-
-    return this.sqliteGetMembers(groupId);
-  }
-
-  private sqliteGetMembers(groupId: number): Member[] {
-    if (!this.sqliteService.isReady()) {
-      return [];
-    }
-
-    const db = this.sqliteService.getDatabase();
-    const members = db.prepare(`
-      SELECT u.* FROM users u
-      INNER JOIN group_members gm ON u.id = gm.member_id
-      WHERE gm.group_id = ?
-    `).all(groupId) as any[];
-
-    return members.map(m => ({
-      id: m.id,
-      name: m.name,
-      email: m.email,
-      phone: m.phone || '',
-      dateOfBirth: m.dateOfBirth ? new Date(m.dateOfBirth) : new Date(),
-      address: m.address || '',
-      preferences: m.preferences,
-      paymentMethod: m.paymentMethod,
-      paymentDetails: m.paymentDetails,
-      role: m.role,
-      createdAt: new Date(m.createdAt),
-      updatedAt: new Date(m.updatedAt),
-    }));
-  }
+  async removeMember(groupId: any, memberId: string): Promise<void> { if (this.usesFirebase()) { const snapshot = await this.firestoreService.collection('groupMembers').where('groupId', '==', String(groupId)).where('memberId', '==', memberId).get(); await Promise.all(snapshot.docs.map(doc => doc.ref.delete())); return; } this.sqliteService.getDatabase().prepare('DELETE FROM group_members WHERE group_id = ? AND member_id = ?').run(groupId, memberId); }
+  async getMembers(groupId: any): Promise<Member[]> { if (this.usesFirebase()) return []; const db = this.sqliteService.getDatabase(); return db.prepare('SELECT u.* FROM users u INNER JOIN group_members gm ON u.id = gm.member_id WHERE gm.group_id = ?').all(groupId) as Member[]; }
+  private permissions(value: unknown): string[] { try { return typeof value === 'string' ? JSON.parse(value) : Array.isArray(value) ? value : []; } catch { return []; } }
 }

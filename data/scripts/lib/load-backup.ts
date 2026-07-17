@@ -1,7 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import Database from 'better-sqlite3';
-import { createClient } from '@supabase/supabase-js';
 import {
   BACKUP_TABLES,
   BackupData,
@@ -9,6 +8,9 @@ import {
   BackupSource,
   LegacyUser,
 } from './backup-types';
+import { exportFromSupabase } from './supabase-export-stub';
+
+export { exportFromSupabase };
 
 const EMPTY_DATA = (): BackupData => ({
   users: [],
@@ -93,39 +95,6 @@ export function exportFromSqlite(sqlitePath: string): BackupManifest {
   return {
     version: '1.0',
     source: 'sqlite',
-    exportedAt: new Date().toISOString(),
-    counts: countRows(data),
-    data,
-  };
-}
-
-export async function exportFromSupabase(): Promise<BackupManifest> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !key) {
-    throw new Error('Supabase credentials missing (NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)');
-  }
-
-  const supabase = createClient(url, key);
-  const data = EMPTY_DATA();
-
-  for (const table of BACKUP_TABLES) {
-    const { data: rows, error } = await supabase.from(table).select('*');
-    if (error && !error.message.includes('does not exist')) {
-      console.warn(`⚠️  Supabase table ${table}: ${error.message}`);
-    }
-    const list = rows ?? [];
-    if (table === 'users') {
-      data.users = list.map((row) => normalizeUser(row as Record<string, unknown>));
-    } else {
-      (data[table as keyof BackupData] as Record<string, unknown>[]) = list as Record<string, unknown>[];
-    }
-  }
-
-  return {
-    version: '1.0',
-    source: 'supabase',
     exportedAt: new Date().toISOString(),
     counts: countRows(data),
     data,

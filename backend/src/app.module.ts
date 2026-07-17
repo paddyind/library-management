@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { SupabaseModule } from './config/supabase.module';
 import { SqliteModule } from './config/sqlite.module';
 import { FirebaseModule } from './config/firebase.module';
 import { PlatformModule } from './platform/platform.module';
@@ -23,7 +22,6 @@ import { RatingsModule } from './ratings/ratings.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    SupabaseModule,
     SqliteModule,
     FirebaseModule,
     PlatformModule,

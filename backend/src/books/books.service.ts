@@ -1,627 +1,80 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
-import { SupabaseService } from '../config/supabase.service';
 import { SqliteService } from '../config/sqlite.service';
 import { FirestoreService } from '../config/firestore.service';
-import { getDataStorage } from '../config/data-storage.util';
+import { usesFirebase } from '../config/storage.util';
 import { CreateBookDto, UpdateBookDto } from '../dto/book.dto';
 import { Book, BookStatus } from './book.interface';
 
 @Injectable()
 export class BooksService {
   constructor(
-    private readonly supabaseService: SupabaseService,
     private readonly sqliteService: SqliteService,
     private readonly firestoreService: FirestoreService,
     private readonly configService: ConfigService,
   ) {}
 
-  private usesFirebase(): boolean {
-    return getDataStorage(this.configService) === 'firebase' && this.firestoreService.isReady();
-  }
+  private usesFirebase(): boolean { return usesFirebase(this.configService, this.firestoreService); }
+  private getPreferredStorage(): 'sqlite' { return 'sqlite'; }
 
-  private getPreferredStorage(): 'supabase' | 'sqlite' {
-    const storagePreference = this.configService.get<string>('AUTH_STORAGE', 'auto').toLowerCase();
-    
-    // Force SQLite if explicitly configured
-    if (storagePreference === 'sqlite') {
-      return 'sqlite';
-    }
-    
-    // Force Supabase if explicitly configured (even if health check failed)
-    if (storagePreference === 'supabase') {
-      return 'supabase';
-    }
-    
-    // Auto mode (default): Use Supabase ONLY if health check passed at startup
-    if (this.supabaseService.isReady()) {
-      return 'supabase';
-    }
-    
-    // Default to SQLite if Supabase health check failed or not configured
-    return 'sqlite';
-  }
-
-  async create(createBookDto: CreateBookDto, ownerId: string): Promise<Book> {
+  async create(dto: CreateBookDto, ownerId: string): Promise<Book> {
     if (this.usesFirebase()) {
-      return this.firestoreCreate(createBookDto, ownerId);
+      const id = randomUUID(), now = new Date();
+      const book = { title: dto.title, author: dto.author, isbn: dto.isbn ?? '', owner_id: ownerId,
+        count: 1, status: BookStatus.AVAILABLE, forSale: false, genre: dto.genre ?? null, tags: dto.tags ?? [], createdAt: now, updatedAt: now };
+      await this.firestoreService.collection('books').doc(id).set(book);
+      return { id, ...book, isAvailable: true };
     }
-
-    const storage = this.getPreferredStorage();
-
-    if (storage === 'supabase') {
-      try {
-        console.log('📚 Attempting to create book in Supabase...');
-        const supabase = this.supabaseService.getClient();
-        const { data, error } = await supabase
-          .from('books')
-          .insert([{ ...createBookDto, owner_id: ownerId }])
-          .select()
-          .single();
-
-        if (error) {
-          console.error('❌ Supabase insert error:', {
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint,
-          });
-          console.warn('⚠️ Falling back to SQLite for book creation');
-          return this.sqliteCreate(createBookDto, ownerId);
-        }
-
-        console.log('✅ Book created successfully in Supabase:', data.id);
-        return data;
-      } catch (error: any) {
-        console.error('❌ Supabase connection exception:', {
-          message: error.message,
-          stack: error.stack,
-        });
-        console.warn('⚠️ Falling back to SQLite for book creation');
-        return this.sqliteCreate(createBookDto, ownerId);
-      }
-    }
-
-    return this.sqliteCreate(createBookDto, ownerId);
-  }
-
-  private sqliteCreate(createBookDto: CreateBookDto, ownerId: string): Book {
-    if (!this.sqliteService.isReady()) {
-      throw new Error('SQLite database is not available');
-    }
-
-    const sqliteBook = this.sqliteService.createBook({
-      title: createBookDto.title,
-      author: createBookDto.author,
-      isbn: createBookDto.isbn || '',
-      owner_id: ownerId,
-    });
-    
-    // Convert SQLite Book to Book interface (add missing fields)
-    return {
-      id: sqliteBook.id,
-      title: sqliteBook.title,
-      author: sqliteBook.author,
-      isbn: sqliteBook.isbn,
-      owner_id: sqliteBook.owner_id,
-      status: (sqliteBook.status as any) || BookStatus.AVAILABLE,
-      count: 1,
-      forSale: false,
-      createdAt: sqliteBook.createdAt,
-      updatedAt: sqliteBook.updatedAt,
-    };
+    return this.mapSqlite(this.sqliteService.createBook({ title: dto.title, author: dto.author, isbn: dto.isbn || '', owner_id: ownerId }));
   }
 
   async findAll(query?: string, forSale?: boolean): Promise<Book[]> {
     if (this.usesFirebase()) {
-      return this.firestoreFindAll(query, forSale);
+      const snapshot = await this.firestoreService.collection('books').get();
+      const q = query?.toLowerCase();
+      return snapshot.docs.map(doc => this.firestoreService.docToData<Book>(doc)).filter(book =>
+        !q || book.title.toLowerCase().includes(q) || book.author.toLowerCase().includes(q) || book.isbn?.toLowerCase().includes(q))
+        .filter(book => !forSale || book.forSale === true);
     }
-
-    const storage = this.getPreferredStorage();
-
-    if (storage === 'supabase') {
-      try {
-        console.log(`📚 [BooksService] findAll: Querying books${query ? ` with filter: ${query}` : ''}`);
-        let queryBuilder = this.supabaseService.getClient().from('books').select('*');
-
-        if (query) {
-          queryBuilder = queryBuilder.or(`title.ilike.%${query}%,author.ilike.%${query}%,isbn.ilike.%${query}%`);
-        }
-
-        if (forSale) {
-          queryBuilder = queryBuilder.eq('forSale', true);
-        }
-
-        const { data, error } = await queryBuilder;
-
-        if (error) {
-          console.error(`❌ [BooksService] findAll error:`, error.message, error.code);
-          console.warn('⚠️ Supabase query error, falling back to SQLite:', error.message);
-          return this.sqliteFindAll(query);
-        }
-
-        console.log(`✅ [BooksService] findAll: Found ${data?.length || 0} books`);
-        
-        // Check availability based on active transactions
-        const booksWithAvailability = await Promise.all((data || []).map(async (book) => {
-          const isAvailable = await this.checkBookAvailability(book.id, 'supabase');
-          return {
-            ...book,
-            status: isAvailable ? BookStatus.AVAILABLE : BookStatus.BORROWED,
-            isAvailable,
-          };
-        }));
-        
-        return booksWithAvailability;
-      } catch (error: any) {
-        console.error(`❌ [BooksService] findAll exception:`, error.message);
-        console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
-        return this.sqliteFindAll(query);
-      }
-    }
-
-    console.log(`📚 [BooksService] findAll: Using SQLite${query ? ` with filter: ${query}` : ''}`);
-    return this.sqliteFindAll(query);
-  }
-
-  private sqliteFindAll(query?: string): Book[] {
-    if (!this.sqliteService.isReady()) {
-      console.log('📚 SQLite not available - returning empty array');
-      return [];
-    }
-
-    // Removed log to reduce noise - books are fetched on demand
-    const sqliteBooks = this.sqliteService.findAllBooks(query);
-    // Convert SQLite Book[] to Book[] interface (add missing fields) and check availability
-    const db = this.sqliteService.getDatabase();
-    const booksWithAvailability = sqliteBooks.map(book => {
-      const isAvailable = this.checkBookAvailabilitySync(book.id);
-      
-      // Get count from database if available
-      let bookCount = 1;
-      try {
-        const countResult = db.prepare('SELECT count FROM books WHERE id = ?').get(book.id) as any;
-        bookCount = countResult?.count ?? 1;
-      } catch (e) {
-        // Count column might not exist
-        bookCount = 1;
-      }
-      
-      return {
-        id: book.id,
-        title: book.title,
-        author: book.author,
-        isbn: book.isbn,
-        owner_id: book.owner_id,
-        status: isAvailable ? BookStatus.AVAILABLE : BookStatus.BORROWED,
-        count: bookCount,
-        forSale: false,
-        isAvailable,
-        createdAt: book.createdAt,
-        updatedAt: book.updatedAt,
-      };
-    });
-    return booksWithAvailability;
+    if (!this.sqliteService.isReady()) return [];
+    return this.sqliteService.findAllBooks(query).map(book => this.mapSqlite(book));
   }
 
   async findOne(id: string, userId?: string): Promise<Book> {
     if (this.usesFirebase()) {
-      return this.firestoreFindOne(id, userId);
+      const doc = await this.firestoreService.collection('books').doc(id).get();
+      if (!doc.exists) throw new NotFoundException(`Book with ID "${id}" not found`);
+      return this.firestoreService.docToData<Book>(doc);
     }
-
-    const storage = this.getPreferredStorage();
-
-    if (storage === 'supabase') {
-      try {
-        const { data, error } = await this.supabaseService
-          .getClient()
-          .from('books')
-          .select('*')
-          .eq('id', id)
-          .single();
-
-        if (error) {
-          console.warn('⚠️ Supabase query error, falling back to SQLite:', error.message);
-          return this.sqliteFindOne(id, userId);
-        }
-
-        // Check availability and set isAvailable property
-        const isAvailable = await this.checkBookAvailability(data.id, 'supabase');
-        
-        // Check if current user has borrowed this book
-        let borrowedByMe = false;
-        if (userId) {
-          try {
-            const { data: transaction } = await this.supabaseService
-              .getClient()
-              .from('transactions')
-              .select('id')
-              .eq('bookId', id)
-              .eq('memberId', userId)
-              .eq('type', 'borrow')
-              .in('status', ['active', 'pending_return_approval'])
-              .maybeSingle();
-            
-            borrowedByMe = !!transaction;
-          } catch (checkError: any) {
-            // Ignore errors when checking user's transaction
-            console.debug('Could not check if user borrowed book:', checkError.message);
-          }
-        }
-        
-        return {
-          ...data,
-          status: borrowedByMe ? 'with_me' : (isAvailable ? BookStatus.AVAILABLE : BookStatus.BORROWED),
-          isAvailable: isAvailable && !borrowedByMe,
-          borrowedByMe,
-        };
-      } catch (error: any) {
-        console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
-        return this.sqliteFindOne(id, userId);
-      }
-    }
-
-    return this.sqliteFindOne(id, userId);
+    const book = this.sqliteService.isReady() ? this.sqliteService.findBookById(id) : undefined;
+    if (!book) throw new NotFoundException(`Book with ID "${id}" not found`);
+    return this.mapSqlite(book);
   }
 
-  private sqliteFindOne(id: string, userId?: string): Book {
-    if (!this.sqliteService.isReady()) {
-      throw new NotFoundException(`Book with ID "${id}" not found`);
-    }
-
-    const sqliteBook = this.sqliteService.findBookById(id);
-    if (!sqliteBook) {
-      throw new NotFoundException(`Book with ID "${id}" not found`);
-    }
-
-    // Check availability
-    const isAvailable = this.checkBookAvailabilitySync(id);
-    
-    // Check if current user has borrowed this book
-    let borrowedByMe = false;
-    if (userId) {
-      try {
-        const db = this.sqliteService.getDatabase();
-        const transaction = db.prepare(`
-          SELECT id FROM transactions 
-          WHERE bookId = ? AND memberId = ? AND type = 'borrow' 
-          AND status IN ('active', 'pending_return_approval')
-        `).get(id, userId) as any;
-        
-        borrowedByMe = !!transaction;
-      } catch (checkError: any) {
-        // Ignore errors when checking user's transaction
-        console.debug('Could not check if user borrowed book:', checkError.message);
-      }
-    }
-    
-    // Get count from database if available
-    let bookCount = 1;
-    try {
-      const db = this.sqliteService.getDatabase();
-      const countResult = db.prepare('SELECT count FROM books WHERE id = ?').get(id) as any;
-      bookCount = countResult?.count ?? 1;
-    } catch (e) {
-      // Count column might not exist
-      bookCount = 1;
-    }
-
-    // Convert SQLite Book to Book interface (add missing fields)
-    return {
-      id: sqliteBook.id,
-      title: sqliteBook.title,
-      author: sqliteBook.author,
-      isbn: sqliteBook.isbn,
-      owner_id: sqliteBook.owner_id,
-      status: borrowedByMe ? 'with_me' : (isAvailable ? BookStatus.AVAILABLE : BookStatus.BORROWED),
-      count: bookCount,
-      forSale: false,
-      isAvailable: isAvailable && !borrowedByMe,
-      borrowedByMe,
-      createdAt: sqliteBook.createdAt,
-      updatedAt: sqliteBook.updatedAt,
-    };
-  }
-
-  async update(id: string, updateBookDto: UpdateBookDto): Promise<Book> {
+  async update(id: string, dto: UpdateBookDto): Promise<Book> {
     if (this.usesFirebase()) {
-      return this.firestoreUpdate(id, updateBookDto);
+      const ref = this.firestoreService.collection('books').doc(id);
+      if (!(await ref.get()).exists) throw new NotFoundException(`Book with ID "${id}" not found`);
+      await ref.update({ ...dto, updatedAt: new Date() });
+      return this.findOne(id);
     }
-
-    const storage = this.getPreferredStorage();
-
-    if (storage === 'supabase') {
-      try {
-        const { data, error } = await this.supabaseService
-          .getClient()
-          .from('books')
-          .update(updateBookDto)
-          .eq('id', id)
-          .single();
-
-        if (error) {
-          console.warn('⚠️ Supabase update error, falling back to SQLite:', error.message);
-          return this.sqliteUpdate(id, updateBookDto);
-        }
-
-        return data;
-      } catch (error: any) {
-        console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
-        return this.sqliteUpdate(id, updateBookDto);
-      }
-    }
-
-    return this.sqliteUpdate(id, updateBookDto);
-  }
-
-  private sqliteUpdate(id: string, updateBookDto: UpdateBookDto): Book {
-    if (!this.sqliteService.isReady()) {
-      throw new Error('SQLite database is not available');
-    }
-
-    try {
-      const sqliteBook = this.sqliteService.updateBook(id, {
-        title: updateBookDto.title,
-        author: updateBookDto.author,
-        isbn: updateBookDto.isbn,
-      });
-      
-      // Convert SQLite Book to Book interface (add missing fields)
-      return {
-        id: sqliteBook.id,
-        title: sqliteBook.title,
-        author: sqliteBook.author,
-        isbn: sqliteBook.isbn,
-        owner_id: sqliteBook.owner_id,
-        status: (sqliteBook.status ? (sqliteBook.status as BookStatus) : BookStatus.AVAILABLE),
-        count: 1,
-        forSale: false,
-        createdAt: sqliteBook.createdAt,
-        updatedAt: sqliteBook.updatedAt,
-      };
-    } catch (error: any) {
-      throw new NotFoundException(`Book with ID "${id}" not found`);
-    }
+    try { return this.mapSqlite(this.sqliteService.updateBook(id, { title: dto.title, author: dto.author, isbn: dto.isbn })); }
+    catch { throw new NotFoundException(`Book with ID "${id}" not found`); }
   }
 
   async remove(id: string): Promise<void> {
     if (this.usesFirebase()) {
-      return this.firestoreRemove(id);
+      const ref = this.firestoreService.collection('books').doc(id);
+      if (!(await ref.get()).exists) throw new NotFoundException(`Book with ID "${id}" not found`);
+      await ref.delete(); return;
     }
-
-    const storage = this.getPreferredStorage();
-
-    if (storage === 'supabase') {
-      try {
-        const { error } = await this.supabaseService.getClient().from('books').delete().eq('id', id);
-
-        if (error) {
-          console.warn('⚠️ Supabase delete error, falling back to SQLite:', error.message);
-          this.sqliteRemove(id);
-          return;
-        }
-
-        return;
-      } catch (error: any) {
-        console.warn('⚠️ Supabase connection failed, falling back to SQLite:', error.message);
-        this.sqliteRemove(id);
-        return;
-      }
-    }
-
-    this.sqliteRemove(id);
+    try { this.sqliteService.deleteBook(id); } catch { throw new NotFoundException(`Book with ID "${id}" not found`); }
   }
 
-  private sqliteRemove(id: string): void {
-    if (!this.sqliteService.isReady()) {
-      throw new Error('SQLite database is not available');
-    }
-
-    try {
-      this.sqliteService.deleteBook(id);
-    } catch (error: any) {
-      throw new NotFoundException(`Book with ID "${id}" not found`);
-    }
-  }
-
-  private async checkBookAvailability(bookId: string, storage: 'supabase' | 'sqlite'): Promise<boolean> {
-    if (storage === 'supabase') {
-      try {
-        // Get book with count (default to 1 if count column doesn't exist)
-        const { data: book } = await this.supabaseService.getClient()
-          .from('books')
-          .select('id, count')
-          .eq('id', bookId)
-          .single();
-        
-        if (!book) {
-          return false; // Book doesn't exist
-        }
-        
-        const bookCount = book.count ?? 1;
-        
-        // Count active transactions for this book
-        const { count: activeBorrows } = await this.supabaseService.getClient()
-          .from('transactions')
-          .select('*', { count: 'exact', head: true })
-          .eq('bookId', bookId)
-          .eq('type', 'borrow')
-          .in('status', ['active', 'pending_return_approval']);
-        
-        // Book is available if: bookCount - activeBorrows > 0
-        return (bookCount - (activeBorrows || 0)) > 0;
-      } catch (error) {
-        return true; // Default to available if check fails
-      }
-    } else {
-      return this.checkBookAvailabilitySync(bookId);
-    }
-  }
-
-  private checkBookAvailabilitySync(bookId: string): boolean {
-    if (!this.sqliteService.isReady()) {
-      return true; // Default to available if SQLite not ready
-    }
-    
-    try {
-      const db = this.sqliteService.getDatabase();
-      
-      // Get book count (default to 1 if count column doesn't exist)
-      let bookCount = 1;
-      try {
-        const book = db.prepare('SELECT count FROM books WHERE id = ?').get(bookId) as any;
-        bookCount = book?.count ?? 1;
-      } catch (e) {
-        // Count column might not exist, default to 1
-        bookCount = 1;
-      }
-      
-      // Count active transactions for this book (only valid books)
-      const result = db.prepare(`
-        SELECT COUNT(*) as count 
-        FROM transactions t
-        INNER JOIN books b ON t.bookId = b.id
-        WHERE t.bookId = ? 
-          AND t.type = 'borrow' 
-          AND t.status IN ('active', 'pending_return_approval')
-      `).get(bookId) as any;
-      
-      const activeBorrows = result?.count || 0;
-      
-      // Book is available if: bookCount - activeBorrows > 0
-      return (bookCount - activeBorrows) > 0;
-    } catch (error) {
-      return true; // Default to available if check fails
-    }
-  }
-
-  private async firestoreCreate(createBookDto: CreateBookDto, ownerId: string): Promise<Book> {
-    const id = randomUUID();
-    const now = new Date();
-    const doc = {
-      title: createBookDto.title,
-      author: createBookDto.author,
-      isbn: createBookDto.isbn ?? '',
-      owner_id: ownerId,
-      count: 1,
-      status: BookStatus.AVAILABLE,
-      forSale: false,
-      genre: createBookDto.genre ?? null,
-      tags: createBookDto.tags ?? [],
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    await this.firestoreService.collection('books').doc(id).set(doc);
-    return { id, ...doc, isAvailable: true };
-  }
-
-  private async firestoreFindAll(query?: string, forSale?: boolean): Promise<Book[]> {
-    const snapshot = await this.firestoreService.collection('books').get();
-    let books = snapshot.docs.map((doc) => this.firestoreService.docToData<Book>(doc));
-
-    if (query) {
-      const q = query.toLowerCase();
-      books = books.filter(
-        (book) =>
-          book.title?.toLowerCase().includes(q) ||
-          book.author?.toLowerCase().includes(q) ||
-          book.isbn?.toLowerCase().includes(q),
-      );
-    }
-
-    if (forSale) {
-      books = books.filter((book) => book.forSale === true);
-    }
-
-    return Promise.all(
-      books.map(async (book) => {
-        const isAvailable = await this.checkBookAvailabilityFirestore(book.id, book.count ?? 1);
-        return {
-          ...book,
-          status: isAvailable ? BookStatus.AVAILABLE : BookStatus.BORROWED,
-          isAvailable,
-        };
-      }),
-    );
-  }
-
-  private async firestoreFindOne(id: string, userId?: string): Promise<Book> {
-    const doc = await this.firestoreService.collection('books').doc(id).get();
-    if (!doc.exists) {
-      throw new NotFoundException(`Book with ID "${id}" not found`);
-    }
-
-    const book = this.firestoreService.docToData<Book>(doc);
-    const isAvailable = await this.checkBookAvailabilityFirestore(book.id, book.count ?? 1);
-
-    let borrowedByMe = false;
-    if (userId) {
-      const txSnapshot = await this.firestoreService
-        .collection('transactions')
-        .where('bookId', '==', id)
-        .where('memberId', '==', userId)
-        .where('type', '==', 'borrow')
-        .get();
-
-      borrowedByMe = txSnapshot.docs.some((tx) => {
-        const status = tx.data().status as string;
-        return status === 'active' || status === 'pending_return_approval';
-      });
-    }
-
-    return {
-      ...book,
-      status: borrowedByMe ? 'with_me' : isAvailable ? BookStatus.AVAILABLE : BookStatus.BORROWED,
-      isAvailable: isAvailable && !borrowedByMe,
-      borrowedByMe,
-    };
-  }
-
-  private async firestoreUpdate(id: string, updateBookDto: UpdateBookDto): Promise<Book> {
-    const ref = this.firestoreService.collection('books').doc(id);
-    const existing = await ref.get();
-    if (!existing.exists) {
-      throw new NotFoundException(`Book with ID "${id}" not found`);
-    }
-
-    const updates = {
-      ...updateBookDto,
-      updatedAt: new Date(),
-    };
-
-    await ref.update(updates);
-    return this.firestoreFindOne(id);
-  }
-
-  private async firestoreRemove(id: string): Promise<void> {
-    const ref = this.firestoreService.collection('books').doc(id);
-    const existing = await ref.get();
-    if (!existing.exists) {
-      throw new NotFoundException(`Book with ID "${id}" not found`);
-    }
-
-    await ref.delete();
-  }
-
-  private async checkBookAvailabilityFirestore(bookId: string, bookCount: number): Promise<boolean> {
-    try {
-      const snapshot = await this.firestoreService
-        .collection('transactions')
-        .where('bookId', '==', bookId)
-        .where('type', '==', 'borrow')
-        .get();
-
-      const activeBorrows = snapshot.docs.filter((doc) => {
-        const status = doc.data().status as string;
-        return status === 'active' || status === 'pending_return_approval';
-      }).length;
-
-      return bookCount - activeBorrows > 0;
-    } catch {
-      return true;
-    }
+  private mapSqlite(book: any): Book {
+    return { id: book.id, title: book.title, author: book.author, isbn: book.isbn, owner_id: book.owner_id,
+      status: book.status || BookStatus.AVAILABLE, count: book.count ?? 1, forSale: false,
+      createdAt: new Date(book.createdAt), updatedAt: new Date(book.updatedAt) };
   }
 }
-

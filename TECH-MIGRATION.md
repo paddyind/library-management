@@ -19,9 +19,9 @@
 | **3** | Migrate backups | ✅ Complete | None — opt-in migration script |
 | **4** | Backend cutover (flags) | ✅ Complete | `IAM_PROVIDER=keycloak` + `DATA_STORAGE=firebase` |
 | **5** | Frontend OIDC | ✅ Complete | Keycloak login when flags enabled |
-| **6** | Decommission Supabase | ⏳ Not started | Full cutover |
+| **6** | Decommission Supabase | ✅ Complete | Supabase removed; Firestore + Keycloak are runtime |
 
-**Last updated:** 2026-07-08 — Phases 4–5 complete; Phase 6 (Supabase removal) remains
+**Last updated:** 2026-07-17 — Phase 6 complete; v3.0.0 cutover
 
 > **Resume here:** [identity-platform/STATUS.md](../identity-platform/STATUS.md) · [SETUP-VALIDATION.md](../identity-platform/docs/SETUP-VALIDATION.md)
 
@@ -383,14 +383,15 @@ docker compose up -d --force-recreate backend frontend
 # Open http://localhost:3300/login → Sign in with Keycloak
 ```
 
-### Phase 6 — Decommission Supabase
+### Phase 6 — Decommission Supabase ✅ Complete
 
-- Remove `@supabase/supabase-js`, `SupabaseModule`, `AUTH_STORAGE`
-- Archive `data/schema/supabase_complete_schema.sql` (legacy note)
-- Update `ARCHITECTURE.md`, `DATABASE.md`, `README.md` fully
-- Release **v3.0.0** in `CHANGELOG.md`
+- [x] Removed `@supabase/supabase-js`, `SupabaseModule`, `AUTH_STORAGE`
+- [x] All Nest services use Firestore (`DATA_STORAGE=firebase`) or SQLite (`legacy`)
+- [x] Archived schema: `data/schema/legacy/supabase_complete_schema.sql`
+- [x] Updated `ARCHITECTURE.md`, `DATABASE.md`, `.env.example`
+- [x] Released **v3.0.0** in `CHANGELOG.md`
 
-**Exit:** App runs without Supabase credentials.
+**Exit:** App runs without Supabase credentials. ✅ Verified 2026-07-17.
 
 ---
 

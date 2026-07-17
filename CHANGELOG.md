@@ -5,55 +5,27 @@ All notable changes to the Library Management System will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — v3.0.0 Platform Migration
+## [3.0.0] - 2026-07-17
+
+### Removed
+- **Supabase** — `@supabase/supabase-js`, `SupabaseModule`, `AUTH_STORAGE`, and all runtime Supabase data/auth paths
+- Legacy `/api/auth/login|register` when `IAM_PROVIDER=keycloak` (returns 410)
+
+### Added / Changed
+- **IAM:** Keycloak OIDC (`IAM_PROVIDER=keycloak`) with JWKS validation (`AppAuthGuard`)
+- **Data:** Firebase Firestore (`DATA_STORAGE=firebase`) with `library__*` collections
+- **Frontend:** `keycloak-js` PKCE login/register/logout
+- **Migration:** `npm run db:backup` + `npm run migrate:keycloak-firestore`
+- SQLite remains only as optional `DATA_STORAGE=legacy` / `IAM_PROVIDER=legacy` rollback
+
+### Migration docs
+- [TECH-MIGRATION.md](TECH-MIGRATION.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DATABASE.md](DATABASE.md)
+
+## [Unreleased]
 
 ### Planned
-
-- **IAM:** Keycloak (OIDC, self-service registration) replacing custom JWT + Supabase Auth
-- **Data:** Firebase Firestore (SaaS, separate dev/prod projects) replacing Supabase Postgres + SQLite runtime
-- **Migration:** Import from `backend/backups/*.json` into Keycloak + Firestore; force password reset for imported users
-- **Transition:** `IAM_PROVIDER` / `DATA_STORAGE` feature flags; Supabase/SQLite remain fallback until Phase 6 cutover
-- **Documentation:** [TECH-MIGRATION.md](TECH-MIGRATION.md) master runbook; architecture banner in [ARCHITECTURE.md](ARCHITECTURE.md)
-
-### Phase 0 (completed)
-
-- Added `TECH-MIGRATION.md` with decisions, phased plan, Firebase dev/prod guidance, and decommission checklist
-- Updated `ARCHITECTURE.md`, `.env.example`, `README.md` with migration pointers
-- No runtime or Docker changes in Phase 0
-
-### Phase 1 (superseded by 1.5)
-
-- Keycloak was briefly embedded in library compose (port 3310); moved to workspace platform
-
-### Phase 5 (completed)
-
-- **Frontend OIDC** — `keycloak-js`, Keycloak login/register/logout when `NEXT_PUBLIC_IAM_PROVIDER=keycloak`
-
-### Phase 4 (completed)
-
-- **`KeycloakAuthGuard`** + **`AppAuthGuard`** — JWKS validation, unified auth across all controllers
-- **Firestore paths** for profiles, books, transactions when `DATA_STORAGE=firebase`
-- Legacy auth endpoints return 410 when `IAM_PROVIDER=keycloak`
-
-### Phase 3 (completed)
-
-- **`export-backup.ts`** + **`migrate-to-keycloak-firestore.ts`** — SQLite/Supabase JSON → Keycloak realm `library` + `library__*` Firestore
-- Idempotent upserts, `--dry-run`, migration reports under `backend/backups/`
-- Demo users excluded from Keycloak; legacy `idMap` in report for FK remapping
-
-### Phase 2 (completed)
-
-- **`FirebaseModule`** + **`FirestoreService`** — Admin SDK, prefixed collections (`library__*`)
-- **`docs/firestore_collections.md`** — field definitions for all library collections
-- **`npm run db:seed:firestore`** — demo books into `personal-apps-dev`
-- **`GET /api/platform/status`** — migration flags + Firestore ping
-- Books CRUD on `/api/books` when `DATA_STORAGE=firebase` (default remains `legacy`)
-
-### Phase 1.5 (completed)
-
-- **`identity-platform`** repo: shared Keycloak on **3510**, realm-per-app, Firestore conventions
-- Library compose no longer runs Keycloak; canonical realm at `identity-platform/realms/library-realm.json`
-- Docs: `identity-platform/docs/ARCHITECTURE.md`, `DATA-PLATFORM.md`
+- Production Keycloak SMTP + password-reset email verification for imported users
+- Optional cleanup of unused loans module
 
 ## [2.0.1] - 2025-12-20
 

@@ -38,8 +38,6 @@
     "db:cleanup": "ts-node data/scripts/cleanup-database.ts",
     "db:cleanup-loans": "ts-node data/scripts/cleanup-librarian-loans.ts",
     "db:help": "ts-node data/scripts/db-manager.ts help",
-    "supabase:sql": "node data/scripts/apply-supabase-migrations.js",
-    "supabase:migrate": "ts-node data/scripts/apply-supabase-migrations-auto.ts",
     "db:seed:firestore": "ts-node src/scripts/seed-firestore.ts"
   },
   "dependencies": {
@@ -49,7 +47,6 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/swagger": "^11.2.1",
-    "@supabase/supabase-js": "^2.76.1",
     "bcryptjs": "^3.0.2",
     "better-sqlite3": "^12.4.1",
     "class-transformer": "^0.5.1",

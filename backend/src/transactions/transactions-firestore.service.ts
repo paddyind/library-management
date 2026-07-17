@@ -2,7 +2,6 @@ import { Injectable, NotFoundException, ServiceUnavailableException } from '@nes
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import * as admin from 'firebase-admin';
-import { SupabaseService } from '../config/supabase.service';
 import { SqliteService } from '../config/sqlite.service';
 import { FirestoreService } from '../config/firestore.service';
 import { getLegacyStorage, usesFirebase } from '../config/storage.util';
@@ -42,7 +41,6 @@ export class TransactionsFirestoreService {
   constructor(
     private readonly firestoreService: FirestoreService,
     private readonly configService: ConfigService,
-    private readonly supabaseService: SupabaseService,
   ) {}
 
   isActive(): boolean {

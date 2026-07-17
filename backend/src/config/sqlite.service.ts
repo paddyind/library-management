@@ -374,6 +374,36 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_ratings_transaction_id ON ratings(transactionId)
     `);
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS reservations (
+        id INTEGER PRIMARY KEY,
+        member_id TEXT NOT NULL,
+        book_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS book_requests (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        author TEXT NOT NULL,
+        member_id TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS subscriptions (
+        id INTEGER PRIMARY KEY,
+        member_id TEXT NOT NULL,
+        tier TEXT NOT NULL,
+        startDate TEXT NOT NULL,
+        endDate TEXT NOT NULL,
+        isActive INTEGER NOT NULL,
+        price REAL NOT NULL,
+        lendingLimit INTEGER NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+    `);
   }
 
   getDatabase(): Database.Database {

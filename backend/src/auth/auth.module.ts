@@ -7,12 +7,11 @@ import { KeycloakTokenService } from './keycloak-token.service';
 import { AppAuthGuard } from './app-auth.guard';
 import { AdminGuard } from './admin.guard';
 import { RolesGuard } from './roles.guard';
-import { SupabaseModule } from '../config/supabase.module';
 import { SqliteModule } from '../config/sqlite.module';
 import { MembersModule } from '../members/members.module';
 
 @Module({
-  imports: [SupabaseModule, SqliteModule, forwardRef(() => MembersModule)],
+  imports: [SqliteModule, forwardRef(() => MembersModule)],
   controllers: [AuthController],
   providers: [
     AuthService,
