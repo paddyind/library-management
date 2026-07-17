@@ -425,14 +425,15 @@ Restart backend and frontend. No Firestore data is read when `DATA_STORAGE=legac
 
 | Document | Role during migration |
 |----------|----------------------|
-| [TECH-MIGRATION.md](TECH-MIGRATION.md) | This file — library-specific runbook (remove after v3.0.0) |
-| [identity-platform](https://github.com/paddyind/identity-platform) | Workspace IAM — `STATUS.md` for pause/resume |
+| [TECH-MIGRATION.md](TECH-MIGRATION.md) | This file — library-specific runbook (archive after v3.0.0 validation) |
+| [identity-platform](https://github.com/paddyind/identity-platform) | Shared IAM |
+| [identity-platform/docs/ONBOARDING.md](../identity-platform/docs/ONBOARDING.md) | Onboard campus-circle / photobooth / etc. to Keycloak |
 | [identity-platform/docs/ARCHITECTURE.md](../identity-platform/docs/ARCHITECTURE.md) | Keycloak setup / recreate |
 | [identity-platform/docs/DATA-PLATFORM.md](../identity-platform/docs/DATA-PLATFORM.md) | Firestore conventions |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Current + target architecture |
-| [DATABASE.md](DATABASE.md) | Legacy Supabase/SQLite until Phase 6 |
-| [CHANGELOG.md](CHANGELOG.md) | v3.0.0 tracking |
-| [.env.example](.env.example) | All env vars including new placeholders |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Current architecture |
+| [DATABASE.md](DATABASE.md) | Firestore + optional SQLite legacy |
+| [CHANGELOG.md](CHANGELOG.md) | v3.0.0 |
+| [.env.example](.env.example) | Env vars |
 
 ---
 

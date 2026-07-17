@@ -56,7 +56,7 @@ docker compose exec backend npm run db:seed:firestore
 ## Architecture
 
 ```
-Next.js :3300 ──OIDC──► Keycloak :3510 (realm library)
+Next.js :3300 ──OIDC──► Keycloak :3510 (realm library)   ← identity-platform only
       │
       └── Bearer ──► NestJS :3301 ──► Firestore (library__*)
 ```
@@ -66,7 +66,9 @@ Next.js :3300 ──OIDC──► Keycloak :3510 (realm library)
 | `IAM_PROVIDER` | `keycloak` \| `legacy` | OIDC vs custom JWT |
 | `DATA_STORAGE` | `firebase` \| `legacy` | Firestore vs SQLite |
 
-Docs: [ARCHITECTURE.md](ARCHITECTURE.md) · [DATABASE.md](DATABASE.md) · [docs/firestore_collections.md](docs/firestore_collections.md)
+**Keycloak is not part of this compose.** Shared IAM: [identity-platform](https://github.com/paddyind/identity-platform) · onboard other apps: [ONBOARDING.md](../identity-platform/docs/ONBOARDING.md)
+
+Docs: [ARCHITECTURE.md](ARCHITECTURE.md) · [DATABASE.md](DATABASE.md) · [docs/firestore_collections.md](docs/firestore_collections.md) · [keycloak/README.md](keycloak/README.md)
 
 ---
 
