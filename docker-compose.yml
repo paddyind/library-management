@@ -11,6 +11,10 @@ services:
       - NODE_ENV=development
       - PORT=3000
       - NEXT_PUBLIC_API_URL=http://localhost:${LIBRARY_HOST_BACKEND_PORT:-3301}/api
+      - NEXT_PUBLIC_IAM_PROVIDER=${IAM_PROVIDER:-legacy}
+      - NEXT_PUBLIC_KEYCLOAK_URL=${NEXT_PUBLIC_KEYCLOAK_URL:-http://localhost:3510}
+      - NEXT_PUBLIC_KEYCLOAK_REALM=${KEYCLOAK_REALM:-library}
+      - NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-library-frontend}
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - OTEL_SERVICE_NAME=library-management-frontend
@@ -41,7 +45,10 @@ services:
     volumes:
       - ./backend/src:/app/src
       - ./backend/package.json:/app/package.json
+      - ./backend/tsconfig.json:/app/tsconfig.json
+      - ./backend/tsconfig.build.json:/app/tsconfig.build.json
       - ./data:/app/data
+      - ./backend/backups:/app/backend/backups
       - /app/node_modules  # Prevent host node_modules from overriding container's compiled modules
       - ../identity-platform/secrets/firebase-dev.json:/app/secrets/firebase-dev.json:ro
 
@@ -56,8 +63,12 @@ services:
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD}
       - AUTH_STORAGE=${AUTH_STORAGE:-auto}
-      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://host.docker.internal:3510}
+      - IAM_PROVIDER=${IAM_PROVIDER:-legacy}
+      - DATA_STORAGE=${DATA_STORAGE:-legacy}
+      - KEYCLOAK_URL=${KEYCLOAK_INTERNAL_URL:-http://host.docker.internal:3510}
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-library}
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
       - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-}
       - APP_FIRESTORE_PREFIX=${APP_FIRESTORE_PREFIX:-library}
       - GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS:-/app/secrets/firebase-dev.json}

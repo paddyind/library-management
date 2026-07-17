@@ -2,11 +2,11 @@ import { Controller, Get, Post, Body, Param, Patch, UseGuards, Req } from '@nest
 import { ReservationsService } from './reservations.service';
 import { CreateReservationDto } from '../dto/create-reservation.dto';
 import { Reservation } from './reservation.interface';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AppAuthGuard } from '../auth/app-auth.guard';
 import type { Request } from 'express';
 
 @Controller('reservations')
-@UseGuards(JwtAuthGuard)
+@UseGuards(AppAuthGuard)
 export class ReservationsController {
   constructor(private readonly reservationsService: ReservationsService) {}
 

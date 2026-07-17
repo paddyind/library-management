@@ -7,6 +7,7 @@ import { Transaction, TransactionType } from './transaction.interface';
 import { subscriptionPlans } from '../config/subscription-plans';
 import { MembersService } from '../members/members.service';
 import { MemberRole } from '../members/member.interface';
+import { TransactionsFirestoreService } from './transactions-firestore.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -16,6 +17,7 @@ export class TransactionsService {
     private readonly sqliteService: SqliteService,
     private readonly configService: ConfigService,
     private readonly membersService: MembersService,
+    private readonly transactionsFirestoreService: TransactionsFirestoreService,
   ) {}
 
   private getPreferredStorage(): 'supabase' | 'sqlite' {
@@ -34,6 +36,10 @@ export class TransactionsService {
   }
 
   async create(createTransactionDto: CreateTransactionDto, memberId: string, userData?: { email?: string; name?: string; role?: MemberRole }): Promise<Transaction> {
+    if (this.transactionsFirestoreService.isActive()) {
+      return this.transactionsFirestoreService.create(createTransactionDto, memberId);
+    }
+
     const { bookId, type } = createTransactionDto;
     const storage = this.getPreferredStorage();
     
@@ -415,6 +421,10 @@ export class TransactionsService {
   }
 
   async findAll(bookId?: string): Promise<any[]> {
+    if (this.transactionsFirestoreService.isActive()) {
+      return this.transactionsFirestoreService.findAll(bookId);
+    }
+
     const storage = this.getPreferredStorage();
     
     if (storage === 'supabase') {
@@ -514,6 +524,10 @@ export class TransactionsService {
   }
 
   async findMemberTransactions(memberId: string): Promise<any[]> {
+    if (this.transactionsFirestoreService.isActive()) {
+      return this.transactionsFirestoreService.findMemberTransactions(memberId);
+    }
+
     const storage = this.getPreferredStorage();
     
     if (storage === 'supabase') {
@@ -596,6 +610,10 @@ export class TransactionsService {
   }
 
   async return(transactionId: string, memberId: string): Promise<Transaction> {
+    if (this.transactionsFirestoreService.isActive()) {
+      return this.transactionsFirestoreService.returnBook(transactionId, memberId);
+    }
+
     const storage = this.getPreferredStorage();
     const now = new Date();
 
@@ -807,6 +825,10 @@ export class TransactionsService {
   }
 
   async renew(transactionId: string, memberId: string): Promise<Transaction> {
+    if (this.transactionsFirestoreService.isActive()) {
+      return this.transactionsFirestoreService.renew(transactionId, memberId);
+    }
+
     const storage = this.getPreferredStorage();
     const now = new Date();
 
@@ -1279,6 +1301,10 @@ export class TransactionsService {
    * Changes status from pending_return_approval to completed
    */
   async approveReturn(transactionId: string, approverId: string): Promise<Transaction> {
+    if (this.transactionsFirestoreService.isActive()) {
+      return this.transactionsFirestoreService.approveReturn(transactionId);
+    }
+
     const storage = this.getPreferredStorage();
     const now = new Date();
 
@@ -1388,6 +1414,10 @@ export class TransactionsService {
    * Changes status from pending_return_approval back to active
    */
   async rejectReturn(transactionId: string, approverId: string, reason?: string): Promise<Transaction> {
+    if (this.transactionsFirestoreService.isActive()) {
+      return this.transactionsFirestoreService.rejectReturn(transactionId, reason);
+    }
+
     const storage = this.getPreferredStorage();
     const now = new Date();
 

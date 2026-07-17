@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { ConfigService } from '@nestjs/config';
 import { SupabaseService } from '../config/supabase.service';
 import { SqliteService } from '../config/sqlite.service';
+import { FirestoreService } from '../config/firestore.service';
+import { getLegacyStorage, usesFirebase } from '../config/storage.util';
 import { CreateMemberDto, UpdateMemberDto } from '../dto/member.dto';
 import { Member, MemberRole } from './member.interface';
 
@@ -10,30 +12,16 @@ export class MembersService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly sqliteService: SqliteService,
+    private readonly firestoreService: FirestoreService,
     private readonly configService: ConfigService,
   ) {}
 
   private getPreferredStorage(): 'supabase' | 'sqlite' {
-    const storagePreference = this.configService.get<string>('AUTH_STORAGE', 'auto').toLowerCase();
-    
-    // Force SQLite if explicitly configured
-    if (storagePreference === 'sqlite') {
-      return 'sqlite';
-    }
-    
-    // Force Supabase if explicitly configured (even if health check failed)
-    if (storagePreference === 'supabase') {
-      return 'supabase';
-    }
-    
-    // Auto mode (default): Use Supabase ONLY if health check passed at startup
-    // Once health check is done, stick with the decision for the session
-    if (this.supabaseService.isReady()) {
-      return 'supabase';
-    }
-    
-    // Default to SQLite if Supabase health check failed or not configured
-    return 'sqlite';
+    return getLegacyStorage(this.configService, this.supabaseService);
+  }
+
+  private usesFirebase(): boolean {
+    return usesFirebase(this.configService, this.firestoreService);
   }
 
   async create(createMemberDto: CreateMemberDto, role: MemberRole = MemberRole.MEMBER): Promise<Member> {
@@ -97,6 +85,10 @@ export class MembersService {
   }
 
   async findAll(query?: string): Promise<Member[]> {
+    if (this.usesFirebase()) {
+      return this.findAllFromFirestore(query);
+    }
+
     const storage = this.getPreferredStorage();
 
     if (storage === 'supabase') {
@@ -182,6 +174,10 @@ export class MembersService {
   }
 
   async findOne(id: string): Promise<Member> {
+    if (this.usesFirebase()) {
+      return this.findOneFromFirestore(id);
+    }
+
     const storage = this.getPreferredStorage();
 
     // Try Supabase first if preferred (credentials exist)
@@ -548,5 +544,77 @@ export class MembersService {
     if (error) {
       throw new NotFoundException(`Member with ID "${id}" not found`);
     }
+  }
+
+  async ensureKeycloakProfile(input: {
+    id: string;
+    email: string;
+    name: string;
+    role: MemberRole;
+  }): Promise<Member> {
+    if (!this.usesFirebase()) {
+      throw new NotFoundException(`Member with ID "${input.id}" not found`);
+    }
+
+    const now = new Date();
+    const profile = {
+      email: input.email,
+      name: input.name,
+      role: input.role,
+      keycloakSub: input.id,
+      phone: '',
+      address: '',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await this.firestoreService.collection('profiles').doc(input.id).set(profile, { merge: true });
+    return this.findOneFromFirestore(input.id);
+  }
+
+  private mapFirestoreProfile(id: string, data: Record<string, unknown>): Member {
+    const roleRaw = String(data.role ?? 'member').toLowerCase();
+    let role = MemberRole.MEMBER;
+    if (roleRaw === 'admin') role = MemberRole.ADMIN;
+    else if (roleRaw === 'librarian') role = MemberRole.LIBRARIAN;
+
+    return {
+      id,
+      email: String(data.email ?? ''),
+      name: String(data.name ?? data.email ?? 'User'),
+      phone: String(data.phone ?? ''),
+      dateOfBirth: data.dateOfBirth ? new Date(String(data.dateOfBirth)) : new Date(),
+      address: String(data.address ?? ''),
+      preferences: data.preferences ? String(data.preferences) : undefined,
+      paymentMethod: data.paymentMethod ? String(data.paymentMethod) : undefined,
+      paymentDetails: data.paymentDetails ? String(data.paymentDetails) : undefined,
+      role,
+      createdAt: data.createdAt instanceof Date ? data.createdAt : new Date(String(data.createdAt ?? Date.now())),
+      updatedAt: data.updatedAt instanceof Date ? data.updatedAt : new Date(String(data.updatedAt ?? Date.now())),
+    };
+  }
+
+  private async findOneFromFirestore(id: string): Promise<Member> {
+    const doc = await this.firestoreService.collection('profiles').doc(id).get();
+    if (!doc.exists) {
+      throw new NotFoundException(`Member with ID "${id}" not found`);
+    }
+    return this.mapFirestoreProfile(doc.id, doc.data() as Record<string, unknown>);
+  }
+
+  private async findAllFromFirestore(query?: string): Promise<Member[]> {
+    const snapshot = await this.firestoreService.collection('profiles').get();
+    let members = snapshot.docs.map((doc) =>
+      this.mapFirestoreProfile(doc.id, doc.data() as Record<string, unknown>),
+    );
+
+    if (query) {
+      const q = query.toLowerCase();
+      members = members.filter(
+        (m) => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q),
+      );
+    }
+
+    return members.sort((a, b) => a.name.localeCompare(b.name));
   }
 }

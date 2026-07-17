@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@n
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { MembersService } from './members.service';
 import { CreateMemberDto, UpdateMemberDto } from '../dto/member.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AppAuthGuard } from '../auth/app-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { MemberRole } from './member.interface';
@@ -10,7 +10,7 @@ import { MemberRole } from './member.interface';
 @ApiTags('Members')
 @Controller('members')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(AppAuthGuard, RolesGuard)
 export class MembersController {
   constructor(private readonly membersService: MembersService) {}
 

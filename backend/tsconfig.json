@@ -24,6 +24,7 @@
   },
   "exclude": [
     "src/migrate.ts",
-    "src/dto/notification.dto.ts"
+    "src/dto/notification.dto.ts",
+    "data"
   ]
 }

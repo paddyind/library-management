@@ -1,5 +1,5 @@
 import { Controller, Post, Body, UseGuards, Get, Param, Delete } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AppAuthGuard } from '../auth/app-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { MemberRole } from '../members/member.interface';
@@ -9,7 +9,7 @@ import { CreateBookRequestDto } from '../dto/book-request.dto';
 import { GetMember } from '../auth/get-member.decorator';
 
 @Controller('book-requests')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(AppAuthGuard, RolesGuard)
 export class BookRequestsController {
   constructor(private readonly bookRequestsService: BookRequestsService) {}
 

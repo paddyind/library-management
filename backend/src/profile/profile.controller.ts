@@ -1,6 +1,6 @@
 import { Controller, Get, Put, Body, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AppAuthGuard } from '../auth/app-auth.guard';
 import { ProfileService } from './profile.service';
 import { UpdateMemberDto } from '../dto/member.dto';
 import type { Request } from 'express';
@@ -8,7 +8,7 @@ import { Member } from '../members/member.interface';
 
 @ApiTags('Profile')
 @Controller('profile')
-@UseGuards(JwtAuthGuard)
+@UseGuards(AppAuthGuard)
 @ApiBearerAuth()
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}

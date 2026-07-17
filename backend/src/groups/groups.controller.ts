@@ -2,13 +2,13 @@ import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, ParseIntPip
 import { GroupsService } from './groups.service';
 import { CreateGroupDto, UpdateGroupDto, AddMemberDto } from '../dto/create-group.dto';
 import { Group } from './group.interface';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AppAuthGuard } from '../auth/app-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { MemberRole } from '../members/member.interface';
 
 @Controller('groups')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(AppAuthGuard, RolesGuard)
 export class GroupsController {
   constructor(private readonly groupsService: GroupsService) {}
 

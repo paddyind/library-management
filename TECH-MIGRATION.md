@@ -15,13 +15,13 @@
 | **0** | Documentation | ✅ Complete | None |
 | **1** | Keycloak (library-local :3310) | ✅ Superseded | Removed from library compose |
 | **1.5** | Workspace identity-platform (:3510) | ✅ **Complete** | None — shared IAM stack |
-| **2** | Firebase + NestJS (`library__*`) | ⏳ Not started | None until flags enabled |
-| **3** | Migrate backups | ⏳ Not started | None |
-| **4** | Backend cutover (flags) | ⏳ Not started | Optional flags |
-| **5** | Frontend OIDC | ⏳ Not started | Login when enabled |
+| **2** | Firebase + NestJS (`library__*`) | ✅ Complete | None until `DATA_STORAGE=firebase` |
+| **3** | Migrate backups | ✅ Complete | None — opt-in migration script |
+| **4** | Backend cutover (flags) | ✅ Complete | `IAM_PROVIDER=keycloak` + `DATA_STORAGE=firebase` |
+| **5** | Frontend OIDC | ✅ Complete | Keycloak login when flags enabled |
 | **6** | Decommission Supabase | ⏳ Not started | Full cutover |
 
-**Last updated:** 2026-06-05 — Phase 1.5 complete; identity-platform repo; pause before Phase 2
+**Last updated:** 2026-07-08 — Phases 4–5 complete; Phase 6 (Supabase removal) remains
 
 > **Resume here:** [identity-platform/STATUS.md](../identity-platform/STATUS.md) · [SETUP-VALIDATION.md](../identity-platform/docs/SETUP-VALIDATION.md)
 
@@ -294,40 +294,94 @@ docker volume rm library-management-keycloak-db-data 2>/dev/null || true
 cd ../identity-platform && docker compose up -d
 ```
 
-### Phase 2 — Firebase Firestore (workspace + library)
+### Phase 2 — Firebase Firestore (workspace + library) ✅ Complete
 
-- `FirebaseModule` + `FirestoreService` in NestJS (Admin SDK)
-- `APP_FIRESTORE_PREFIX=library` → `library__*` collections
-- `data/schema/firestore_collections.md` (library field definitions)
-- `data/migrations/firebase/firestore.rules` (path rules for `library__*`)
-- Seed script: `npm run db:seed:firestore`
+- [x] `FirebaseModule` + `FirestoreService` in NestJS (Admin SDK)
+- [x] `APP_FIRESTORE_PREFIX=library` → `library__*` collections
+- [x] `docs/firestore_collections.md` (library field definitions)
+- [x] Firestore rules: `identity-platform/firestore/firestore.rules` (deny client SDK)
+- [x] Seed script: `npm run db:seed:firestore`
+- [x] `GET /api/platform/status` — Firestore connectivity diagnostic
+- [x] Books CRUD via existing `/api/books` when `DATA_STORAGE=firebase`
 
-**Exit:** Backend CRUD for `library__books` against `personal-apps-dev`.
+**Exit:** Backend CRUD for `library__books` against `personal-apps-dev`. ✅ Verified 2026-07-08.
 
-### Phase 3 — Migrate backups
+**Try Firestore mode (dev):**
 
-- Script: `data/scripts/migrate-to-keycloak-firestore.ts`
-- Dry-run mode (`--dry-run`)
-- Idempotent upserts
-- Report: `backend/backups/migration-report-{timestamp}.json`
+```bash
+# In library-management/.env
+DATA_STORAGE=firebase
 
-**Exit:** Dev Firebase + Keycloak match backup manifest counts.
+docker compose up -d --force-recreate backend
+docker compose exec backend npm run db:seed:firestore
+curl http://localhost:3301/api/platform/status
+curl http://localhost:3301/api/books
+```
 
-### Phase 4 — Backend cutover (behind flags)
+### Phase 3 — Migrate backups ✅ Complete
 
-- `KeycloakAuthGuard` (JWKS validation)
-- Replace `getPreferredStorage()` with `FirestoreService` when `DATA_STORAGE=firebase`
-- Deprecate custom `/api/auth/login` when `IAM_PROVIDER=keycloak`
+- [x] `data/scripts/export-backup.ts` — JSON export from SQLite/Supabase (`npm run db:backup`)
+- [x] `data/scripts/migrate-to-keycloak-firestore.ts` — Keycloak users + Firestore upserts
+- [x] `--dry-run` mode
+- [x] Idempotent upserts (re-run safe)
+- [x] Report: `backend/backups/migration-report-{timestamp}.json`
+- [x] Demo users skipped; books owned by demo users reassigned to first real admin
+- [x] `KEYCLOAK_INTERNAL_URL` in Docker compose (backend → `host.docker.internal:3510`)
 
-**Exit:** Full API works with `IAM_PROVIDER=keycloak` + `DATA_STORAGE=firebase` on dev.
+**Exit:** Dev Firebase + Keycloak match backup manifest counts. ✅ Verified 2026-07-08.
 
-### Phase 5 — Frontend OIDC
+**Run migration:**
 
-- Keycloak JS adapter or NextAuth Keycloak provider
-- Self-service register/login UI flows
-- `withAuth` reads roles from token claims
+```bash
+# 1. Export backup (optional — script falls back to live SQLite)
+docker compose exec backend npm run db:backup
 
-**Exit:** End-to-end borrow/return/review on Keycloak + Firestore (dev).
+# 2. Dry run
+docker compose exec backend npm run migrate:keycloak-firestore -- --dry-run
+
+# 3. Live migration
+docker compose exec backend npm run migrate:keycloak-firestore
+
+# Report written to backend/backups/migration-report-*.json
+```
+
+**Expected skips:** `group_members` referencing demo-only users are not imported (recreate groups after Phase 5 or re-seed demo users in Keycloak manually).
+
+### Phase 4 — Backend cutover (behind flags) ✅ Complete
+
+- [x] `KeycloakTokenService` + `KeycloakAuthGuard` (JWKS validation)
+- [x] `AppAuthGuard` — routes to Keycloak or legacy JWT based on `IAM_PROVIDER`
+- [x] All controllers use `AppAuthGuard` (replaces mixed JWT/Supabase guards)
+- [x] `MembersService` Firestore profiles + `ensureKeycloakProfile()`
+- [x] `TransactionsFirestoreService` — borrow/return/renew/approve on Firestore
+- [x] `BooksService` Firestore CRUD (Phase 2)
+- [x] Legacy `/api/auth/login|register` returns 410 when `IAM_PROVIDER=keycloak`
+
+**Exit:** Backend accepts Keycloak tokens + Firestore data when both flags enabled.
+
+### Phase 5 — Frontend OIDC ✅ Complete
+
+- [x] `keycloak-js` adapter (`src/lib/keycloak.js`)
+- [x] `AuthContext` — Keycloak SSO when `NEXT_PUBLIC_IAM_PROVIDER=keycloak`
+- [x] Login page — “Sign in with Keycloak” + PKCE
+- [x] Register page — redirects to Keycloak self-registration
+- [x] Logout — Keycloak session end
+- [x] Docker compose passes `NEXT_PUBLIC_KEYCLOAK_*` env vars
+
+**Exit:** End-to-end login via Keycloak; API calls use Keycloak access token.
+
+**Enable full stack (dev):**
+
+```env
+# library-management/.env
+IAM_PROVIDER=keycloak
+DATA_STORAGE=firebase
+```
+
+```bash
+docker compose up -d --force-recreate backend frontend
+# Open http://localhost:3300/login → Sign in with Keycloak
+```
 
 ### Phase 6 — Decommission Supabase
 

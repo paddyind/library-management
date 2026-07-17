@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'crypto';
 import { SupabaseService } from '../config/supabase.service';
 import { SqliteService } from '../config/sqlite.service';
+import { FirestoreService } from '../config/firestore.service';
+import { getDataStorage } from '../config/data-storage.util';
 import { CreateBookDto, UpdateBookDto } from '../dto/book.dto';
 import { Book, BookStatus } from './book.interface';
 
@@ -10,8 +13,13 @@ export class BooksService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly sqliteService: SqliteService,
+    private readonly firestoreService: FirestoreService,
     private readonly configService: ConfigService,
   ) {}
+
+  private usesFirebase(): boolean {
+    return getDataStorage(this.configService) === 'firebase' && this.firestoreService.isReady();
+  }
 
   private getPreferredStorage(): 'supabase' | 'sqlite' {
     const storagePreference = this.configService.get<string>('AUTH_STORAGE', 'auto').toLowerCase();
@@ -36,6 +44,10 @@ export class BooksService {
   }
 
   async create(createBookDto: CreateBookDto, ownerId: string): Promise<Book> {
+    if (this.usesFirebase()) {
+      return this.firestoreCreate(createBookDto, ownerId);
+    }
+
     const storage = this.getPreferredStorage();
 
     if (storage === 'supabase') {
@@ -102,6 +114,10 @@ export class BooksService {
   }
 
   async findAll(query?: string, forSale?: boolean): Promise<Book[]> {
+    if (this.usesFirebase()) {
+      return this.firestoreFindAll(query, forSale);
+    }
+
     const storage = this.getPreferredStorage();
 
     if (storage === 'supabase') {
@@ -190,6 +206,10 @@ export class BooksService {
   }
 
   async findOne(id: string, userId?: string): Promise<Book> {
+    if (this.usesFirebase()) {
+      return this.firestoreFindOne(id, userId);
+    }
+
     const storage = this.getPreferredStorage();
 
     if (storage === 'supabase') {
@@ -305,6 +325,10 @@ export class BooksService {
   }
 
   async update(id: string, updateBookDto: UpdateBookDto): Promise<Book> {
+    if (this.usesFirebase()) {
+      return this.firestoreUpdate(id, updateBookDto);
+    }
+
     const storage = this.getPreferredStorage();
 
     if (storage === 'supabase') {
@@ -362,6 +386,10 @@ export class BooksService {
   }
 
   async remove(id: string): Promise<void> {
+    if (this.usesFirebase()) {
+      return this.firestoreRemove(id);
+    }
+
     const storage = this.getPreferredStorage();
 
     if (storage === 'supabase') {
@@ -465,6 +493,134 @@ export class BooksService {
       return (bookCount - activeBorrows) > 0;
     } catch (error) {
       return true; // Default to available if check fails
+    }
+  }
+
+  private async firestoreCreate(createBookDto: CreateBookDto, ownerId: string): Promise<Book> {
+    const id = randomUUID();
+    const now = new Date();
+    const doc = {
+      title: createBookDto.title,
+      author: createBookDto.author,
+      isbn: createBookDto.isbn ?? '',
+      owner_id: ownerId,
+      count: 1,
+      status: BookStatus.AVAILABLE,
+      forSale: false,
+      genre: createBookDto.genre ?? null,
+      tags: createBookDto.tags ?? [],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await this.firestoreService.collection('books').doc(id).set(doc);
+    return { id, ...doc, isAvailable: true };
+  }
+
+  private async firestoreFindAll(query?: string, forSale?: boolean): Promise<Book[]> {
+    const snapshot = await this.firestoreService.collection('books').get();
+    let books = snapshot.docs.map((doc) => this.firestoreService.docToData<Book>(doc));
+
+    if (query) {
+      const q = query.toLowerCase();
+      books = books.filter(
+        (book) =>
+          book.title?.toLowerCase().includes(q) ||
+          book.author?.toLowerCase().includes(q) ||
+          book.isbn?.toLowerCase().includes(q),
+      );
+    }
+
+    if (forSale) {
+      books = books.filter((book) => book.forSale === true);
+    }
+
+    return Promise.all(
+      books.map(async (book) => {
+        const isAvailable = await this.checkBookAvailabilityFirestore(book.id, book.count ?? 1);
+        return {
+          ...book,
+          status: isAvailable ? BookStatus.AVAILABLE : BookStatus.BORROWED,
+          isAvailable,
+        };
+      }),
+    );
+  }
+
+  private async firestoreFindOne(id: string, userId?: string): Promise<Book> {
+    const doc = await this.firestoreService.collection('books').doc(id).get();
+    if (!doc.exists) {
+      throw new NotFoundException(`Book with ID "${id}" not found`);
+    }
+
+    const book = this.firestoreService.docToData<Book>(doc);
+    const isAvailable = await this.checkBookAvailabilityFirestore(book.id, book.count ?? 1);
+
+    let borrowedByMe = false;
+    if (userId) {
+      const txSnapshot = await this.firestoreService
+        .collection('transactions')
+        .where('bookId', '==', id)
+        .where('memberId', '==', userId)
+        .where('type', '==', 'borrow')
+        .get();
+
+      borrowedByMe = txSnapshot.docs.some((tx) => {
+        const status = tx.data().status as string;
+        return status === 'active' || status === 'pending_return_approval';
+      });
+    }
+
+    return {
+      ...book,
+      status: borrowedByMe ? 'with_me' : isAvailable ? BookStatus.AVAILABLE : BookStatus.BORROWED,
+      isAvailable: isAvailable && !borrowedByMe,
+      borrowedByMe,
+    };
+  }
+
+  private async firestoreUpdate(id: string, updateBookDto: UpdateBookDto): Promise<Book> {
+    const ref = this.firestoreService.collection('books').doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) {
+      throw new NotFoundException(`Book with ID "${id}" not found`);
+    }
+
+    const updates = {
+      ...updateBookDto,
+      updatedAt: new Date(),
+    };
+
+    await ref.update(updates);
+    return this.firestoreFindOne(id);
+  }
+
+  private async firestoreRemove(id: string): Promise<void> {
+    const ref = this.firestoreService.collection('books').doc(id);
+    const existing = await ref.get();
+    if (!existing.exists) {
+      throw new NotFoundException(`Book with ID "${id}" not found`);
+    }
+
+    await ref.delete();
+  }
+
+  private async checkBookAvailabilityFirestore(bookId: string, bookCount: number): Promise<boolean> {
+    try {
+      const snapshot = await this.firestoreService
+        .collection('transactions')
+        .where('bookId', '==', bookId)
+        .where('type', '==', 'borrow')
+        .get();
+
+      const activeBorrows = snapshot.docs.filter((doc) => {
+        const status = doc.data().status as string;
+        return status === 'active' || status === 'pending_return_approval';
+      }).length;
+
+      return bookCount - activeBorrows > 0;
+    } catch {
+      return true;
     }
   }
 }

@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth, ApiBody } 
 import { BooksService } from './books.service';
 import { CreateBookDto, UpdateBookDto } from '../dto/book.dto';
 import { Book } from '../books/book.interface';
-import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
+import { AppAuthGuard } from '../auth/app-auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
 import type { Request } from 'express';
 
@@ -43,7 +43,7 @@ export class BooksController {
   }
 
   @Post()
-  @UseGuards(SupabaseAuthGuard, AdminGuard)
+  @UseGuards(AppAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create new book', description: 'Add a new book to the catalog (requires authentication)' })
   @ApiBody({ type: CreateBookDto })
@@ -56,7 +56,7 @@ export class BooksController {
   }
 
   @Patch(':id')
-  @UseGuards(SupabaseAuthGuard, AdminGuard)
+  @UseGuards(AppAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update book', description: 'Update book details (requires authentication)' })
   @ApiBody({ type: UpdateBookDto })
@@ -68,7 +68,7 @@ export class BooksController {
   }
 
   @Delete(':id')
-  @UseGuards(SupabaseAuthGuard, AdminGuard)
+  @UseGuards(AppAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete book', description: 'Remove a book from the catalog (requires authentication)' })
   @ApiResponse({ status: 200, description: 'Book deleted successfully' })

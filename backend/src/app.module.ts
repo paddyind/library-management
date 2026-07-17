@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { SupabaseModule } from './config/supabase.module';
 import { SqliteModule } from './config/sqlite.module';
+import { FirebaseModule } from './config/firebase.module';
+import { PlatformModule } from './platform/platform.module';
 import { AuthModule } from './auth/auth.module';
 import { MembersModule } from './members/members.module';
 import { BooksModule } from './books/books.module';
@@ -23,6 +25,8 @@ import { RatingsModule } from './ratings/ratings.module';
     }),
     SupabaseModule,
     SqliteModule,
+    FirebaseModule,
+    PlatformModule,
     AuthModule,
     MembersModule,
     BooksModule,

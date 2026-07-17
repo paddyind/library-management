@@ -1,5 +1,6 @@
-import { useState, useEffect, useContext, createContext } from 'react';
+import { useState, useEffect, useContext, createContext, useCallback } from 'react';
 import axios from 'axios';
+import { getKeycloak, getKeycloakRegisterUrl, isKeycloakMode } from '../lib/keycloak';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -8,71 +9,131 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const keycloakMode = isKeycloakMode();
+
+  const fetchProfile = useCallback(async (token) => {
+    const response = await axios.get(`${API_BASE_URL}/profile`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setUser(response.data);
+    return response.data;
+  }, []);
+
+  const persistToken = (token) => {
+    localStorage.setItem('token', token);
+  };
+
+  const clearSession = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+  };
 
   useEffect(() => {
-    // Check if user is logged in
-    const token = localStorage.getItem('token');
-    if (token) {
-      // Verify token and get user info
-      axios
-        .get(`${API_BASE_URL}/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        .then((response) => {
-          setUser(response.data);
+    let cancelled = false;
+
+    async function bootstrap() {
+      if (keycloakMode) {
+        const keycloak = getKeycloak();
+        if (!keycloak) {
           setLoading(false);
-        })
-        .catch((error) => {
-          // Check if it's a PROFILE_MISSING error
+          return;
+        }
+
+        try {
+          const authenticated = await keycloak.init({
+            onLoad: 'check-sso',
+            pkceMethod: 'S256',
+            checkLoginIframe: false,
+          });
+
+          if (cancelled) return;
+
+          if (authenticated && keycloak.token) {
+            persistToken(keycloak.token);
+            await fetchProfile(keycloak.token);
+          } else {
+            const saved = localStorage.getItem('token');
+            if (saved) {
+              try {
+                await fetchProfile(saved);
+              } catch {
+                clearSession();
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Keycloak init failed:', error.message);
+          clearSession();
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+        return;
+      }
+
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          await fetchProfile(token);
+        } catch (error) {
           const errorCode = error.response?.data?.code;
           const errorMessage = error.response?.data?.message || '';
-          
+
           if (errorCode === 'PROFILE_MISSING' || errorMessage.includes('profile is missing')) {
-            // Profile missing - logout and redirect to login with error
-            localStorage.removeItem('token');
-            setUser(null);
-            setLoading(false);
-            // Redirect to login with error message
+            clearSession();
             if (typeof window !== 'undefined') {
               const message = errorMessage || 'Your account profile is missing. Please contact support.';
               window.location.href = `/login?error=${encodeURIComponent('PROFILE_MISSING')}&message=${encodeURIComponent(message)}`;
             }
           } else {
-            // Other errors - just logout
-            localStorage.removeItem('token');
-            setUser(null);
-            setLoading(false);
+            clearSession();
           }
-        });
-    } else {
-      setLoading(false);
+        }
+      }
+      if (!cancelled) setLoading(false);
     }
-  }, []);
+
+    bootstrap();
+    return () => {
+      cancelled = true;
+    };
+  }, [keycloakMode, fetchProfile]);
 
   const login = async (email, password) => {
-    const response = await axios.post(`${API_BASE_URL}/auth/login`, {
-      email,
-      password,
-    });
-    const { access_token, user: userData } = response.data;
-    localStorage.setItem('token', access_token);
-    
-    // Immediately fetch full profile to ensure we have complete user data (name, role, etc.)
-    try {
-      const profileResponse = await axios.get(`${API_BASE_URL}/profile`, {
-        headers: { Authorization: `Bearer ${access_token}` },
+    if (keycloakMode) {
+      const keycloak = getKeycloak();
+      await keycloak.login({
+        redirectUri: `${window.location.origin}/dashboard`,
       });
-      setUser(profileResponse.data);
-      return { ...response.data, user: profileResponse.data };
+      return null;
+    }
+
+    const response = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
+    const { access_token, user: userData } = response.data;
+    persistToken(access_token);
+
+    try {
+      const profile = await fetchProfile(access_token);
+      return { ...response.data, user: profile };
     } catch (error) {
-      // If profile fetch fails, use login response data as fallback
       console.warn('Failed to fetch profile after login, using login response data:', error.message);
       setUser(userData);
       return response.data;
     }
   };
 
+  const loginWithKeycloak = async (redirectPath = '/dashboard') => {
+    const keycloak = getKeycloak();
+    await keycloak.login({
+      redirectUri: `${window.location.origin}${redirectPath}`,
+    });
+  };
+
   const signUp = async (userData) => {
+    if (keycloakMode) {
+      window.location.href = getKeycloakRegisterUrl();
+      return { data: null, error: null };
+    }
+
     try {
       const response = await axios.post(`${API_BASE_URL}/auth/register`, {
         email: userData.email,
@@ -90,17 +151,33 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    setUser(null);
+  const logout = async () => {
+    if (keycloakMode) {
+      const keycloak = getKeycloak();
+      clearSession();
+      await keycloak.logout({ redirectUri: `${window.location.origin}/` });
+      return;
+    }
+    clearSession();
+  };
+
+  const getAccessToken = () => {
+    if (keycloakMode) {
+      const keycloak = getKeycloak();
+      return keycloak?.token || localStorage.getItem('token');
+    }
+    return localStorage.getItem('token');
   };
 
   const value = {
     user,
     loading,
     login,
+    loginWithKeycloak,
     signUp,
     logout,
+    getAccessToken,
+    keycloakMode,
   };
 
   return (
@@ -119,4 +196,3 @@ export const useAuth = () => {
 };
 
 export default AuthContext;
-

@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nes
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from '../dto/review.dto';
 import { Review } from './review.interface';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AppAuthGuard } from '../auth/app-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { MemberRole, Member } from '../members/member.interface';
@@ -15,7 +15,7 @@ export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AppAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create new review', description: 'Add a new review to a book (requires authentication). Only allowed after returning the book.' })
   @ApiBody({ type: CreateReviewDto })
@@ -35,7 +35,7 @@ export class ReviewsController {
   }
 
   @Get('pending')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(AppAuthGuard, RolesGuard)
   @Roles(MemberRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get pending reviews', description: 'Get all pending reviews awaiting approval (Admin only)' })
@@ -47,7 +47,7 @@ export class ReviewsController {
   }
 
   @Patch(':id/approve')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(AppAuthGuard, RolesGuard)
   @Roles(MemberRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Approve a review', description: 'Approve a pending review (Admin only)' })
@@ -61,7 +61,7 @@ export class ReviewsController {
   }
 
   @Patch(':id/reject')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(AppAuthGuard, RolesGuard)
   @Roles(MemberRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Reject a review', description: 'Reject a pending review with a reason (Admin only)' })

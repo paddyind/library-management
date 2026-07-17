@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Body, UseGuards, Req, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AppAuthGuard } from '../auth/app-auth.guard';
 import { CreateTransactionDto } from '../dto/transaction.dto';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -10,7 +10,7 @@ import type { Request } from 'express';
 
 @ApiTags('Transactions')
 @Controller('transactions')
-@UseGuards(JwtAuthGuard)
+@UseGuards(AppAuthGuard)
 @ApiBearerAuth()
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}

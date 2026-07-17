@@ -25,6 +25,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Keycloak was briefly embedded in library compose (port 3310); moved to workspace platform
 
+### Phase 5 (completed)
+
+- **Frontend OIDC** — `keycloak-js`, Keycloak login/register/logout when `NEXT_PUBLIC_IAM_PROVIDER=keycloak`
+
+### Phase 4 (completed)
+
+- **`KeycloakAuthGuard`** + **`AppAuthGuard`** — JWKS validation, unified auth across all controllers
+- **Firestore paths** for profiles, books, transactions when `DATA_STORAGE=firebase`
+- Legacy auth endpoints return 410 when `IAM_PROVIDER=keycloak`
+
+### Phase 3 (completed)
+
+- **`export-backup.ts`** + **`migrate-to-keycloak-firestore.ts`** — SQLite/Supabase JSON → Keycloak realm `library` + `library__*` Firestore
+- Idempotent upserts, `--dry-run`, migration reports under `backend/backups/`
+- Demo users excluded from Keycloak; legacy `idMap` in report for FK remapping
+
+### Phase 2 (completed)
+
+- **`FirebaseModule`** + **`FirestoreService`** — Admin SDK, prefixed collections (`library__*`)
+- **`docs/firestore_collections.md`** — field definitions for all library collections
+- **`npm run db:seed:firestore`** — demo books into `personal-apps-dev`
+- **`GET /api/platform/status`** — migration flags + Firestore ping
+- Books CRUD on `/api/books` when `DATA_STORAGE=firebase` (default remains `legacy`)
+
 ### Phase 1.5 (completed)
 
 - **`identity-platform`** repo: shared Keycloak on **3510**, realm-per-app, Firestore conventions

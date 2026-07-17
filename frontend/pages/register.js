@@ -1,12 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import AuthLayout from '../src/components/AuthLayout';
+import { useAuth } from '../src/contexts/AuthContext';
+import { getKeycloakRegisterUrl } from '../src/lib/keycloak';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 export default function Register() {
+  const { keycloakMode } = useAuth();
+  const router = useRouter();
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -21,15 +26,31 @@ export default function Register() {
     preferences: [],
     subscription: 'FREE',
   });
-  
+
   const genreOptions = [
-    'Fiction', 'Non-Fiction', 'Mystery', 'Thriller', 'Romance', 
-    'Science Fiction', 'Fantasy', 'Biography'
+    'Fiction', 'Non-Fiction', 'Mystery', 'Thriller', 'Romance',
+    'Science Fiction', 'Fantasy', 'Biography',
   ];
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [otherPreference, setOtherPreference] = useState('');
-  const router = useRouter();
+
+  useEffect(() => {
+    if (keycloakMode && typeof window !== 'undefined') {
+      window.location.href = getKeycloakRegisterUrl();
+    }
+  }, [keycloakMode]);
+
+  if (keycloakMode) {
+    return (
+      <AuthLayout title="Create your account">
+        <p className="mt-8 text-center text-gray-600">Redirecting to Keycloak registration…</p>
+        <p className="mt-4 text-center text-sm">
+          <Link href="/login" className="text-primary-600 hover:text-primary-500">Back to sign in</Link>
+        </p>
+      </AuthLayout>
+    );
+  }
 
   const handleChange = (e) => {
     const { name, value } = e.target;

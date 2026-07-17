@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nes
 import { MembersController } from './members.controller';
 import { MembersService } from './members.service';
 import { CreateMemberDto, UpdateMemberDto } from '../dto/member.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AppAuthGuard } from '../auth/app-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { MemberRole } from './member.interface';
@@ -17,7 +17,7 @@ import type { Request } from 'express';
 @ApiTags('Users')
 @Controller('users')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(AppAuthGuard, RolesGuard)
 export class UsersController {
   constructor(private readonly membersService: MembersService) {}
 
