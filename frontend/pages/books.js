@@ -5,6 +5,11 @@ import Layout from '../src/components/layout/Layout.js';
 import axios from 'axios';
 import withAuth from '../src/components/withAuth';
 import { isAdminOrLibrarian, isMember } from '../src/utils/roleUtils';
+import {
+  bookAvailabilityCountLabel,
+  bookAvailabilityLabel,
+  isBookAvailable,
+} from '../src/utils/bookAvailability';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -120,9 +125,8 @@ function BooksPage() {
                          book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          (book.isbn && book.isbn.toLowerCase().includes(searchQuery.toLowerCase()));
     
-    // Normalize status values for comparison (handle both enum and lowercase)
-    const bookStatus = (book.status || '').toLowerCase();
-    const isAvailable = book.isAvailable || bookStatus === 'available';
+    // Normalize status values for comparison (Available / available / Borrowed / …)
+    const isAvailable = isBookAvailable(book);
     const normalizedStatus = isAvailable ? 'available' : 'borrowed';
     
     const matchesFilter = filterStatus === 'all' || normalizedStatus === filterStatus.toLowerCase();
@@ -245,22 +249,14 @@ function BooksPage() {
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                         borrowedByMe || book.borrowedByMe || book.status === 'with_me'
                           ? 'bg-blue-100 text-blue-800'
-                          : (book.status === 'available' || book.isAvailable) 
+                          : isBookAvailable(book)
                           ? 'bg-green-100 text-green-800' 
                           : 'bg-red-100 text-red-800'
                       }`}>
-                        {borrowedByMe || book.borrowedByMe || book.status === 'with_me'
-                          ? 'With me'
-                          : (book.status === 'available' || book.isAvailable) 
-                          ? 'Available' 
-                          : 'Out of Stock'}
+                        {bookAvailabilityLabel(book, { borrowedByMe })}
                       </span>
                       <span className="text-xs text-gray-500">
-                        {borrowedByMe || book.borrowedByMe || book.status === 'with_me'
-                          ? 'Borrowed by you'
-                          : (book.status === 'available' || book.isAvailable) 
-                          ? '1 available' 
-                          : '0 available'}
+                        {bookAvailabilityCountLabel(book, { borrowedByMe })}
                       </span>
                     </div>
 
@@ -273,7 +269,7 @@ function BooksPage() {
                           );
                           const maxConcurrentLoans = 2; // Gold plan default
                           const canBorrow = activeLoans.length < maxConcurrentLoans;
-                          const isAvailable = book.status === 'available' || book.isAvailable || book.status?.toLowerCase() === 'available';
+                          const available = isBookAvailable(book);
                           const isBorrowing = borrowingBookId === book.id;
                           const isBorrowedByMe = borrowedByMe || book.borrowedByMe || book.status === 'with_me';
                           
@@ -281,11 +277,11 @@ function BooksPage() {
                             <>
                               <button
                                 onClick={() => handleBorrow(book.id)}
-                                disabled={isBorrowedByMe || !isAvailable || !canBorrow || isBorrowing}
+                                disabled={isBorrowedByMe || !available || !canBorrow || isBorrowing}
                                 className={`w-full py-2 px-4 rounded-md text-sm font-medium transition-colors duration-200 ${
                                   isBorrowing
                                     ? 'bg-indigo-400 text-white cursor-wait'
-                                    : isBorrowedByMe || !isAvailable || !canBorrow
+                                    : isBorrowedByMe || !available || !canBorrow
                                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                     : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                                 }`}

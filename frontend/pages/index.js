@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import axios from 'axios';
+import { isBookAvailable } from '../src/utils/bookAvailability';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -73,7 +74,7 @@ export default function WelcomePage() {
           title: book.title || 'Untitled',
           author: book.author || 'Unknown Author',
           isbn: book.isbn || '',
-          available: book.status === 'available' || book.status === undefined || book.available === true,
+          available: isBookAvailable(book) || book.available === true,
         }));
         
         setBooks(mappedBooks);

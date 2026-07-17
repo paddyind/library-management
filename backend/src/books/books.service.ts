@@ -33,19 +33,26 @@ export class BooksService {
     if (this.usesFirebase()) {
       const snapshot = await this.firestoreService.collection('books').get();
       const q = query?.toLowerCase();
-      return snapshot.docs.map(doc => this.firestoreService.docToData<Book>(doc)).filter(book =>
-        !q || book.title.toLowerCase().includes(q) || book.author.toLowerCase().includes(q) || book.isbn?.toLowerCase().includes(q))
-        .filter(book => !forSale || book.forSale === true);
+      return snapshot.docs
+        .map((doc) => this.mapFirestoreBook(this.firestoreService.docToData<Book>(doc)))
+        .filter(
+          (book) =>
+            !q ||
+            book.title.toLowerCase().includes(q) ||
+            book.author.toLowerCase().includes(q) ||
+            book.isbn?.toLowerCase().includes(q),
+        )
+        .filter((book) => !forSale || book.forSale === true);
     }
     if (!this.sqliteService.isReady()) return [];
-    return this.sqliteService.findAllBooks(query).map(book => this.mapSqlite(book));
+    return this.sqliteService.findAllBooks(query).map((book) => this.mapSqlite(book));
   }
 
   async findOne(id: string, userId?: string): Promise<Book> {
     if (this.usesFirebase()) {
       const doc = await this.firestoreService.collection('books').doc(id).get();
       if (!doc.exists) throw new NotFoundException(`Book with ID "${id}" not found`);
-      return this.firestoreService.docToData<Book>(doc);
+      return this.mapFirestoreBook(this.firestoreService.docToData<Book>(doc));
     }
     const book = this.sqliteService.isReady() ? this.sqliteService.findBookById(id) : undefined;
     if (!book) throw new NotFoundException(`Book with ID "${id}" not found`);
@@ -73,8 +80,36 @@ export class BooksService {
   }
 
   private mapSqlite(book: any): Book {
-    return { id: book.id, title: book.title, author: book.author, isbn: book.isbn, owner_id: book.owner_id,
-      status: book.status || BookStatus.AVAILABLE, count: book.count ?? 1, forSale: false,
-      createdAt: new Date(book.createdAt), updatedAt: new Date(book.updatedAt) };
+    const mapped: Book = {
+      id: book.id,
+      title: book.title,
+      author: book.author,
+      isbn: book.isbn,
+      owner_id: book.owner_id,
+      status: book.status || BookStatus.AVAILABLE,
+      count: book.count ?? 1,
+      forSale: false,
+      createdAt: new Date(book.createdAt),
+      updatedAt: new Date(book.updatedAt),
+    };
+    return this.withAvailability(mapped);
+  }
+
+  private mapFirestoreBook(book: Book): Book {
+    return this.withAvailability({
+      ...book,
+      count: book.count ?? 1,
+      status: book.status || BookStatus.AVAILABLE,
+    });
+  }
+
+  private withAvailability(book: Book): Book {
+    const status = String(book.status || '').toLowerCase();
+    const isAvailable =
+      book.isAvailable === true ||
+      status === '' ||
+      status === 'available' ||
+      status === 'new';
+    return { ...book, isAvailable };
   }
 }
