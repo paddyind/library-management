@@ -2,12 +2,14 @@ import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from
 import { Request } from 'express';
 import { MembersService } from '../members/members.service';
 import { KeycloakTokenService } from './keycloak-token.service';
-import { Member } from '../members/member.interface';
+import { KeycloakAdminService } from './keycloak-admin.service';
+import { MemberRole } from '../members/member.interface';
 
 @Injectable()
 export class KeycloakAuthGuard implements CanActivate {
   constructor(
     private readonly keycloakTokenService: KeycloakTokenService,
+    private readonly keycloakAdminService: KeycloakAdminService,
     private readonly membersService: MembersService,
   ) {}
 
@@ -25,7 +27,10 @@ export class KeycloakAuthGuard implements CanActivate {
       const email = payload.email || payload.preferred_username || '';
       const name = this.keycloakTokenService.extractDisplayName(payload);
 
-      // Keycloak realm roles are the source of truth — sync/create Firestore profile mirror.
+      // Ensure direct "member" mapping for Admin Console clarity (idempotent).
+      // Elevated roles (admin/librarian) stay manual via Keycloak Admin.
+      await this.keycloakAdminService.ensureDirectRealmRole(payload.sub, MemberRole.MEMBER);
+
       const member = await this.membersService.ensureKeycloakProfile({
         id: payload.sub,
         email,
