@@ -25,19 +25,15 @@ export class KeycloakAuthGuard implements CanActivate {
       const email = payload.email || payload.preferred_username || '';
       const name = this.keycloakTokenService.extractDisplayName(payload);
 
-      let member: Member;
-      try {
-        member = await this.membersService.findOne(payload.sub);
-      } catch {
-        member = await this.membersService.ensureKeycloakProfile({
-          id: payload.sub,
-          email,
-          name,
-          role,
-        });
-      }
+      // Keycloak realm roles are the source of truth — sync/create Firestore profile mirror.
+      const member = await this.membersService.ensureKeycloakProfile({
+        id: payload.sub,
+        email,
+        name,
+        role,
+      });
 
-      request.user = member;
+      request.user = { ...member, role, email: email || member.email, name: name || member.name };
       return true;
     } catch (error: any) {
       throw new UnauthorizedException(error.message || 'Invalid Keycloak token');

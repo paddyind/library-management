@@ -79,8 +79,22 @@ export class MembersService {
   }
   async ensureKeycloakProfile(input: { id: string; email: string; name: string; role: MemberRole }): Promise<Member> {
     if (!this.usesFirebase()) throw new NotFoundException(`Member with ID "${input.id}" not found`);
+    const ref = this.firestoreService.collection('profiles').doc(input.id);
+    const existing = await ref.get();
     const now = new Date();
-    await this.firestoreService.collection('profiles').doc(input.id).set({ ...input, keycloakSub: input.id, createdAt: now, updatedAt: now }, { merge: true });
+    const patch: Record<string, unknown> = {
+      email: input.email,
+      name: input.name,
+      role: input.role,
+      keycloakSub: input.id,
+      updatedAt: now,
+    };
+    if (!existing.exists) {
+      patch.createdAt = now;
+      patch.phone = '';
+      patch.address = '';
+    }
+    await ref.set(patch, { merge: true });
     return this.findOne(input.id);
   }
   private mapSqlite(user: any): Member {
