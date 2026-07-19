@@ -9,8 +9,7 @@ import {
   logoutFromKeycloak,
   registerWithKeycloak as startKeycloakRegister,
 } from '../lib/keycloak';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+import { getApiBaseUrl, getKeycloakPublicUrl } from '../lib/runtimeConfig';
 
 const AuthContext = createContext();
 
@@ -31,7 +30,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const fetchProfile = useCallback(async (token) => {
-    const response = await axios.get(`${API_BASE_URL}/profile`, {
+    const response = await axios.get(`${getApiBaseUrl()}/profile`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     setUser(response.data);
@@ -86,7 +85,17 @@ export const AuthProvider = ({ children }) => {
           console.error('Keycloak init failed:', error?.message || error);
           if (!cancelled) {
             clearSession();
-            setAuthError('Could not reach the sign-in service. Confirm identity-platform is running on port 3510.');
+            const cfgUrl = getKeycloakPublicUrl();
+            const detail = error?.message || String(error || '');
+            setAuthError(
+              detail.toLowerCase().includes('web crypto')
+                ? detail
+                : detail.toLowerCase().includes('initialized once')
+                ? 'Sign-in client needed a reset. Click “Sign in with Keycloak” again.'
+                : `Could not reach the sign-in service at ${cfgUrl}. ${
+                    detail ? `(${detail}) ` : ''
+                  }Confirm identity-platform is running and this device can open that URL.`,
+            );
           }
         } finally {
           if (!cancelled) setLoading(false);
@@ -125,7 +134,7 @@ export const AuthProvider = ({ children }) => {
       return null;
     }
 
-    const response = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
+    const response = await axios.post(`${getApiBaseUrl()}/auth/login`, { email, password });
     const { access_token, user: userData } = response.data;
     persistToken(access_token);
 
@@ -155,7 +164,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      const response = await axios.post(`${API_BASE_URL}/auth/register`, {
+      const response = await axios.post(`${getApiBaseUrl()}/auth/register`, {
         email: userData.email,
         password: userData.password,
         name: userData.name,

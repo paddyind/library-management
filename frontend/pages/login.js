@@ -86,7 +86,7 @@ export default function Login() {
   }, [router.isReady, user, keycloakMode, finishKeycloakRedirect, router, registerWithKeycloak]);
 
   useEffect(() => {
-    if (authError) setError(describeAuthError('auth', authError) || authError);
+    if (authError) setError(authError);
   }, [authError]);
 
   const handleKeycloakLogin = async () => {

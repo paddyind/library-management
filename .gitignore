@@ -69,6 +69,18 @@ secrets/
 .next/
 out/
 
+# Mobile / Capacitor (generated native projects + local LAN config)
+mobile/android/
+mobile/ios/
+mobile/www/*
+!mobile/www/.gitkeep
+mobile/env.build
+mobile/dist/
+mobile/build-info.json
+mobile/capacitor.config.json
+mobile/.generated-urls.env
+mobile/node_modules/
+
 # Uploads
 uploads/
 public/uploads/

@@ -1,0 +1,22 @@
+# Overlay for phone / tablet / iPad testing on the same LAN as the Docker host.
+# Prefer: ./scripts/run-mobile-local.sh
+#
+# Manual:
+#   export LIBRARY_LAN_IP=$(./scripts/lan-ip.sh)
+#   docker compose -f docker-compose.yml -f docker-compose.mobile.yml up -d --force-recreate frontend backend
+
+services:
+  frontend:
+    environment:
+      - NEXT_PUBLIC_API_URL=http://${LIBRARY_LAN_IP}:3301/api
+      - NEXT_PUBLIC_KEYCLOAK_URL=http://${LIBRARY_LAN_IP}:3510
+      - NEXT_PUBLIC_KEYCLOAK_REALM=${KEYCLOAK_REALM:-library}
+      - NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-library-frontend}
+      - NEXT_PUBLIC_IAM_PROVIDER=keycloak
+
+  backend:
+    environment:
+      # Desktop browser + phone on LAN
+      - CORS_ORIGIN=http://localhost:3300,http://${LIBRARY_LAN_IP}:3300
+      - KEYCLOAK_PUBLIC_URL=http://${LIBRARY_LAN_IP}:3510
+      - KEYCLOAK_URL=${KEYCLOAK_INTERNAL_URL:-http://host.docker.internal:3510}

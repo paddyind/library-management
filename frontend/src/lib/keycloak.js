@@ -1,10 +1,39 @@
 import Keycloak from 'keycloak-js';
+import {
+  describeInsecureOriginHint,
+  ensureWebCryptoForPkce,
+} from './ensureWebCrypto';
 
-const keycloakConfig = {
-  url: process.env.NEXT_PUBLIC_KEYCLOAK_URL || 'http://localhost:3510',
-  realm: process.env.NEXT_PUBLIC_KEYCLOAK_REALM || 'library',
-  clientId: process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID || 'library-frontend',
-};
+function resolveKeycloakConfig() {
+  // Prefer bake-time Next env; allow Capacitor / localStorage runtime override.
+  const runtime =
+    typeof window !== 'undefined'
+      ? window.__LIBRARY_RUNTIME__ ||
+        (() => {
+          try {
+            const raw = localStorage.getItem('library_runtime_v1');
+            return raw ? JSON.parse(raw) : null;
+          } catch {
+            return null;
+          }
+        })()
+      : null;
+
+  return {
+    url:
+      runtime?.keycloakUrl ||
+      process.env.NEXT_PUBLIC_KEYCLOAK_URL ||
+      'http://localhost:3510',
+    realm:
+      runtime?.keycloakRealm ||
+      process.env.NEXT_PUBLIC_KEYCLOAK_REALM ||
+      'library',
+    clientId:
+      runtime?.keycloakClientId ||
+      process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID ||
+      'library-frontend',
+  };
+}
 
 /** Stable page that runs keycloak.init() and completes the OIDC code exchange. */
 export const AUTH_CALLBACK_PATH = '/login';
@@ -21,7 +50,12 @@ export function isKeycloakMode() {
 }
 
 export function getKeycloakConfig() {
-  return { ...keycloakConfig };
+  return resolveKeycloakConfig();
+}
+
+function resetKeycloakClient() {
+  keycloakInstance = null;
+  initPromise = null;
 }
 
 export function getKeycloak() {
@@ -29,7 +63,7 @@ export function getKeycloak() {
     return null;
   }
   if (!keycloakInstance) {
-    keycloakInstance = new Keycloak(keycloakConfig);
+    keycloakInstance = new Keycloak(resolveKeycloakConfig());
   }
   return keycloakInstance;
 }
@@ -80,41 +114,119 @@ function normalizeAppPath(path) {
   return cleaned;
 }
 
+function isAlreadyInitializedError(error) {
+  const msg = String(error?.message || error || '').toLowerCase();
+  return msg.includes('initialized once') || msg.includes('already been initialized');
+}
+
 /**
- * Initialize Keycloak once per page load. Must run on AUTH_CALLBACK_PATH
- * so authorization-code + PKCE can complete.
+ * Initialize Keycloak once per client instance.
+ * On failure, discard the instance so a retry can create a fresh one
+ * (keycloak-js forbids calling init() twice on the same object).
  */
+function pkceInitOptions(extra = {}) {
+  const { polyfilled } = ensureWebCryptoForPkce();
+  const canPkce =
+    typeof globalThis.crypto?.subtle?.digest === 'function' &&
+    typeof globalThis.crypto?.randomUUID === 'function';
+
+  if (!canPkce) {
+    const hint = describeInsecureOriginHint();
+    throw new Error(
+      hint
+        ? `Web Crypto API is not available. ${hint}`
+        : 'Web Crypto API is not available.',
+    );
+  }
+
+  if (polyfilled && process.env.NODE_ENV === 'development') {
+    console.info('[library] Using Web Crypto polyfill for PKCE on a non-secure origin');
+  }
+
+  return {
+    pkceMethod: 'S256',
+    checkLoginIframe: false,
+    ...extra,
+  };
+}
+
 export function initKeycloak() {
-  const keycloak = getKeycloak();
-  if (!keycloak) {
+  if (typeof window === 'undefined') {
     return Promise.resolve({ authenticated: false, keycloak: null });
   }
 
-  if (!initPromise) {
-    initPromise = keycloak
-      .init({
-        onLoad: 'check-sso',
-        pkceMethod: 'S256',
-        checkLoginIframe: false,
-        silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
-      })
-      .then((authenticated) => ({ authenticated, keycloak }))
-      .catch((error) => {
-        initPromise = null;
-        throw error;
-      });
+  const existing = keycloakInstance;
+  // keycloak-js ≥26 sets didInitialize after the first init() attempt
+  if (existing?.didInitialize) {
+    return Promise.resolve({
+      authenticated: Boolean(existing.authenticated),
+      keycloak: existing,
+    });
   }
+
+  if (initPromise) {
+    return initPromise;
+  }
+
+  let initOpts;
+  try {
+    initOpts = pkceInitOptions({
+      onLoad: 'check-sso',
+      silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
+      enableLogging: process.env.NODE_ENV === 'development',
+    });
+  } catch (error) {
+    return Promise.reject(error);
+  }
+
+  const keycloak = getKeycloak();
+  initPromise = keycloak
+    .init(initOpts)
+    .then((authenticated) => ({ authenticated, keycloak }))
+    .catch((error) => {
+      // After the first init() call, keycloak-js refuses a second init().
+      // SSO iframe/timeout failures often still set didInitialize — treat as logged out.
+      if (keycloak.didInitialize || isAlreadyInitializedError(error)) {
+        initPromise = Promise.resolve({
+          authenticated: Boolean(keycloak.authenticated),
+          keycloak,
+        });
+        return initPromise;
+      }
+      resetKeycloakClient();
+      throw error;
+    });
 
   return initPromise;
 }
 
 export async function loginWithKeycloak(returnPath = '/dashboard') {
-  const keycloak = getKeycloak();
-  await initKeycloak();
   setPostLoginRedirect(returnPath);
-  await keycloak.login({
-    redirectUri: getAuthCallbackUri(),
-  });
+
+  try {
+    const { keycloak } = await initKeycloak();
+    await keycloak.login({
+      redirectUri: getAuthCallbackUri(),
+    });
+    return;
+  } catch (error) {
+    const msg = String(error?.message || error || '');
+    if (msg.toLowerCase().includes('web crypto')) {
+      throw error;
+    }
+    // SSO probe can fail (network / iframe); discard and start interactive login.
+    if (isAlreadyInitializedError(error) || keycloakInstance) {
+      resetKeycloakClient();
+    }
+  }
+
+  const keycloak = getKeycloak();
+  await keycloak.init(
+    pkceInitOptions({
+      onLoad: 'login-required',
+      redirectUri: getAuthCallbackUri(),
+    }),
+  );
 }
 
 /**
@@ -126,13 +238,28 @@ export async function loginWithKeycloak(returnPath = '/dashboard') {
  */
 export async function registerWithKeycloak(returnPath = '/dashboard', options = {}) {
   const { skipLogout = false } = options;
-  const keycloak = getKeycloak();
-  await initKeycloak();
   setPostLoginRedirect(returnPath);
   setPostAuthMessage('Account created successfully. Taking you to your dashboard…');
 
+  let keycloak;
+  try {
+    ({ keycloak } = await initKeycloak());
+  } catch {
+    resetKeycloakClient();
+    keycloak = getKeycloak();
+    await keycloak
+      .init(
+        pkceInitOptions({
+          onLoad: 'check-sso',
+          silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
+        }),
+      )
+      .catch(() => {
+        /* continue to register/logout */
+      });
+  }
+
   if (!skipLogout) {
-    // Always clear SSO before registration to avoid session conflicts
     sessionStorage.setItem(PENDING_REGISTER_KEY, '1');
     await keycloak.logout({
       redirectUri: `${window.location.origin}${AUTH_CALLBACK_PATH}?action=register`,
@@ -152,22 +279,37 @@ export function shouldResumeRegistration() {
 }
 
 export async function logoutFromKeycloak() {
-  const keycloak = getKeycloak();
   sessionStorage.removeItem(POST_LOGIN_KEY);
   sessionStorage.removeItem(POST_AUTH_MESSAGE_KEY);
   sessionStorage.removeItem(PENDING_REGISTER_KEY);
   localStorage.removeItem('token');
+
+  const keycloak = keycloakInstance || getKeycloak();
+  resetKeycloakClient();
+
   if (!keycloak) {
     window.location.href = '/';
     return;
   }
-  await keycloak.logout({
-    redirectUri: `${window.location.origin}/`,
-  });
+
+  try {
+    if (!keycloak.didInitialize) {
+      await keycloak.init(
+        pkceInitOptions({
+          onLoad: 'check-sso',
+        }),
+      );
+    }
+    await keycloak.logout({
+      redirectUri: `${window.location.origin}/`,
+    });
+  } catch {
+    window.location.href = '/';
+  }
 }
 
 export function getKeycloakAccountUrl() {
-  const { url, realm } = keycloakConfig;
+  const { url, realm } = resolveKeycloakConfig();
   return `${url}/realms/${realm}/account`;
 }
 
@@ -177,6 +319,15 @@ export function describeAuthError(error, description) {
   const desc = decodeURIComponent((description || '').replace(/\+/g, ' '));
   const combined = `${code} ${desc}`.toLowerCase();
 
+  if (combined.includes('web crypto') || combined.includes('secure context')) {
+    return (
+      describeInsecureOriginHint() ||
+      'Web Crypto is unavailable on this origin. Open http://localhost:3300 instead of a LAN IP, or use the Capacitor app.'
+    );
+  }
+  if (combined.includes('initialized once')) {
+    return 'Sign-in restarted after a connection glitch. Try “Sign in with Keycloak” again.';
+  }
   if (combined.includes('issuer invalid') || combined.includes('jwt issuer')) {
     return 'Sign-in reached Keycloak, but the library API rejected the token (issuer mismatch). This is a server configuration issue — not your password.';
   }
@@ -191,6 +342,10 @@ export function describeAuthError(error, description) {
   }
   if (code === 'login_required') {
     return 'Please sign in to continue.';
+  }
+  if (combined.includes('failed to fetch') || combined.includes('networkerror') || combined.includes('load failed')) {
+    const { url } = resolveKeycloakConfig();
+    return `Could not reach Keycloak at ${url}. Confirm identity-platform is running and this device can open that URL.`;
   }
   if (desc) return desc;
   if (error) return `Sign-in failed (${error}).`;
