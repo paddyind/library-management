@@ -9,6 +9,20 @@ import axios from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
+/** Migrated groups may store permissions as a JSON string instead of an array. */
+function normalizePermissions(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return value ? [value] : [];
+    }
+  }
+  return [];
+}
+
 function Settings() {
   const router = useRouter();
   const { tab } = router.query;
@@ -184,12 +198,24 @@ function Settings() {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
+      const payload = {
+        email: userFormData.email,
+        name: userFormData.name,
+        role: userFormData.role,
+      };
+      if (userFormData.password) {
+        payload.password = userFormData.password;
+      }
       if (editingUser) {
-        await axios.patch(`${API_BASE_URL}/members/${editingUser.id}`, userFormData, {
+        await axios.patch(`${API_BASE_URL}/members/${editingUser.id}`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
       } else {
-        await axios.post(`${API_BASE_URL}/members`, userFormData, {
+        if (!payload.password) {
+          alert('Password is required for new users');
+          return;
+        }
+        await axios.post(`${API_BASE_URL}/members`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
       }
@@ -439,7 +465,26 @@ function Settings() {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button onClick={() => { setEditingBook(book); setBooksFormData({ title: book.title || '', author: book.author || '', isbn: book.isbn || '', count: book.count || 1, status: book.status || 'available', forSale: book.forSale || false, price: book.price || 0 }); setShowBookModal(true); }} className="text-primary-600 hover:text-primary-900 mr-4">Edit</button>
+                          <button onClick={() => {
+                            const rawStatus = String(book.status || 'available').toLowerCase();
+                            const status =
+                              rawStatus === 'borrowed' || rawStatus === 'lent' || rawStatus === 'with_me'
+                                ? 'borrowed'
+                                : rawStatus === 'reserved'
+                                  ? 'reserved'
+                                  : 'available';
+                            setEditingBook(book);
+                            setBooksFormData({
+                              title: book.title || '',
+                              author: book.author || '',
+                              isbn: book.isbn || '',
+                              count: book.count || 1,
+                              status,
+                              forSale: book.forSale || false,
+                              price: book.price || 0,
+                            });
+                            setShowBookModal(true);
+                          }} className="text-primary-600 hover:text-primary-900 mr-4">Edit</button>
                           <button onClick={async () => { if (confirm('Delete book?')) { try { const token = localStorage.getItem('token'); await axios.delete(`${API_BASE_URL}/books/${book.id}`, { headers: { Authorization: `Bearer ${token}` } }); fetchBooks(); } catch (err) { alert(err.response?.data?.message || 'Failed to delete'); } } }} className="text-red-600 hover:text-red-900">Delete</button>
                         </td>
                       </tr>
@@ -456,8 +501,15 @@ function Settings() {
                 <div>
                   <h3 className="text-lg font-medium text-gray-900">User Management</h3>
                   <p className="text-sm text-gray-600 mt-1">
-                    {userIsAdmin ? 'Manage system users and their roles' : 'View system users (read-only)'}
+                    {userIsAdmin
+                      ? 'Manage users and roles — changes sync to Keycloak (realm library) and the app profile'
+                      : 'View system users (read-only)'}
                   </p>
+                  {userIsAdmin && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Source of truth for login/roles is Keycloak. Editing here updates Keycloak; Keycloak Admin changes appear in the app after the user signs in again.
+                    </p>
+                  )}
                 </div>
                 {userIsAdmin && (
                   <button
@@ -522,7 +574,9 @@ function Settings() {
                 <div>
                   <h3 className="text-lg font-medium text-gray-900">Group Management</h3>
                   <p className="text-sm text-gray-600 mt-1">
-                    {userIsAdmin ? 'Manage user groups and permissions' : 'View user groups (read-only)'}
+                    {userIsAdmin
+                      ? 'Manage app groups and permissions (library data — not Keycloak groups)'
+                      : 'View user groups (read-only)'}
                   </p>
                 </div>
                 {userIsAdmin && (
@@ -544,7 +598,9 @@ function Settings() {
                 </div>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {groups.map((group) => (
+                {groups.map((group) => {
+                  const permissions = normalizePermissions(group.permissions);
+                  return (
                   <div key={group.id} className="bg-white shadow rounded-lg overflow-hidden">
                     <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
                       <h3 className="text-lg font-medium text-gray-900">{group.name}</h3>
@@ -553,8 +609,8 @@ function Settings() {
                     <div className="px-6 py-4">
                       <h4 className="text-sm font-medium text-gray-700 mb-2">Permissions:</h4>
                       <div className="flex flex-wrap gap-2">
-                        {group.permissions && group.permissions.length > 0 ? (
-                          group.permissions.map((perm) => (
+                        {permissions.length > 0 ? (
+                          permissions.map((perm) => (
                             <span key={perm} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{perm}</span>
                           ))
                         ) : (
@@ -565,14 +621,15 @@ function Settings() {
                     <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3">
                       {userIsAdmin && (
                         <>
-                          <button onClick={() => { setEditingGroup(group); setGroupFormData({ name: group.name, description: group.description || '', permissions: group.permissions || [] }); setShowGroupModal(true); }} className="text-sm text-primary-600 hover:text-primary-900 font-medium">Edit</button>
+                          <button onClick={() => { setEditingGroup(group); setGroupFormData({ name: group.name, description: group.description || '', permissions }); setShowGroupModal(true); }} className="text-sm text-primary-600 hover:text-primary-900 font-medium">Edit</button>
                           <button onClick={async () => { if (confirm('Delete group?')) { try { const token = localStorage.getItem('token'); await axios.delete(`${API_BASE_URL}/groups/${group.id}`, { headers: { Authorization: `Bearer ${token}` } }); fetchGroups(); } catch (err) { alert(err.response?.data?.message || 'Failed to delete'); } } }} className="text-sm text-red-600 hover:text-red-900 font-medium">Delete</button>
                         </>
                       )}
                       {!userIsAdmin && <span className="text-gray-400 text-xs">View only</span>}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

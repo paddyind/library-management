@@ -31,8 +31,8 @@ User profile (mirrors legacy `users` / Supabase `profiles`).
 | `author` | string | Required |
 | `isbn` | string | Optional |
 | `owner_id` | string | Profile / user id |
-| `count` | number | Copies available (default 1) |
-| `status` | string | `Available`, `Borrowed`, etc. |
+| `count` | number | **Total copies** (default 1). Borrowing allowed while active loans &lt; count |
+| `status` | string | `Available` / `Borrowed` synced from remaining copies; `Damaged` / `Reserved` are manual |
 | `forSale` | boolean | Marketplace flag |
 | `price` | number | Optional |
 | `genre` | string | Optional |
@@ -86,9 +86,12 @@ User profile (mirrors legacy `users` / Supabase `profiles`).
 |-------|------|-------|
 | `name` | string | |
 | `description` | string | Optional |
+| `permissions` | string[] | App permission labels (e.g. `admin`, `librarian`). Always store as an **array** — migrated SQLite rows may have been JSON strings; API normalizes on read. |
 | `createdBy` | string | |
 | `createdAt` | timestamp | |
 | `updatedAt` | timestamp | |
+
+**Not Keycloak groups.** These are library-domain groupings for the Settings UI. Identity roles live in the Keycloak realm (`admin` / `librarian` / `member`).
 
 ---
 

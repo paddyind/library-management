@@ -16,7 +16,14 @@ export class GroupsService {
   async findAll(): Promise<any[]> {
     if (this.usesFirebase()) {
       const [groups, members] = await Promise.all([this.firestoreService.collection('groups').get(), this.firestoreService.collection('groupMembers').get()]);
-      return groups.docs.map(doc => ({ ...this.firestoreService.docToData<any>(doc), memberCount: members.docs.filter(member => member.data().groupId === doc.id).length }));
+      return groups.docs.map((doc) => {
+        const data = this.firestoreService.docToData<any>(doc);
+        return {
+          ...data,
+          permissions: this.permissions(data.permissions),
+          memberCount: members.docs.filter((member) => member.data().groupId === doc.id).length,
+        };
+      });
     }
     if (!this.sqliteService.isReady()) return [];
     const db = this.sqliteService.getDatabase();
@@ -27,7 +34,12 @@ export class GroupsService {
       const doc = await this.firestoreService.collection('groups').doc(String(id)).get();
       if (!doc.exists) throw new NotFoundException(`Group with ID "${id}" not found`);
       const members = await this.firestoreService.collection('groupMembers').where('groupId', '==', String(id)).get();
-      return { ...(this.firestoreService.docToData<any>(doc)), members: members.docs.map(m => ({ id: m.id, ...m.data() })) } as Group;
+      const data = this.firestoreService.docToData<any>(doc);
+      return {
+        ...data,
+        permissions: this.permissions(data.permissions),
+        members: members.docs.map((m) => ({ id: m.id, ...m.data() })),
+      } as Group;
     }
     const group = this.sqliteService.getDatabase().prepare('SELECT * FROM groups WHERE id = ?').get(id) as any;
     if (!group) throw new NotFoundException(`Group with ID "${id}" not found`);
@@ -36,7 +48,14 @@ export class GroupsService {
   async create(dto: CreateGroupDto): Promise<Group> {
     if (this.usesFirebase()) {
       const id = randomUUID(), now = new Date();
-      await this.firestoreService.collection('groups').doc(id).set({ ...dto, description: dto.description ?? '', permissions: dto.permissions ?? [], createdBy: '', createdAt: now, updatedAt: now });
+      await this.firestoreService.collection('groups').doc(id).set({
+        ...dto,
+        description: dto.description ?? '',
+        permissions: Array.isArray(dto.permissions) ? dto.permissions : this.permissions(dto.permissions),
+        createdBy: '',
+        createdAt: now,
+        updatedAt: now,
+      });
       return this.findOne(id);
     }
     const db = this.sqliteService.getDatabase(), id = Date.now();
@@ -45,7 +64,18 @@ export class GroupsService {
     return this.findOne(id);
   }
   async update(id: any, dto: UpdateGroupDto): Promise<Group> {
-    if (this.usesFirebase()) { const ref = this.firestoreService.collection('groups').doc(String(id)); if (!(await ref.get()).exists) throw new NotFoundException(`Group with ID "${id}" not found`); await ref.update({ ...dto, updatedAt: new Date() }); return this.findOne(id); }
+    if (this.usesFirebase()) {
+      const ref = this.firestoreService.collection('groups').doc(String(id));
+      if (!(await ref.get()).exists) throw new NotFoundException(`Group with ID "${id}" not found`);
+      const patch: Record<string, unknown> = { ...dto, updatedAt: new Date() };
+      if (dto.permissions !== undefined) {
+        patch.permissions = Array.isArray(dto.permissions)
+          ? dto.permissions
+          : this.permissions(dto.permissions);
+      }
+      await ref.update(patch);
+      return this.findOne(id);
+    }
     const db = this.sqliteService.getDatabase(), fields = Object.entries(dto).filter(([, v]) => v !== undefined);
     if (!fields.length) return this.findOne(id);
     try { db.prepare(`UPDATE groups SET ${fields.map(([k]) => `${k} = ?`).join(', ')}, updated_at = ? WHERE id = ?`).run(...fields.map(([k, v]) => k === 'permissions' ? JSON.stringify(v) : v), new Date().toISOString(), id); return this.findOne(id); }

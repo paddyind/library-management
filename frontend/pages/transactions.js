@@ -409,10 +409,13 @@ function TransactionsPage() {
                       <div className="mt-2 sm:flex sm:justify-between">
                         <div className="sm:flex">
                           <p className="flex items-center text-sm text-gray-500">
-                            {(user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'librarian') && transaction.member ? (
+                            {(user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'librarian') ? (
                               <>
-                                Borrowed by: {transaction.member.name || 'Unknown'} 
-                                {transaction.member.phone && ` (${transaction.member.phone})`}
+                                Borrowed by:{' '}
+                                {transaction.member?.name || transaction.member?.email || 'Unknown member'}
+                                {transaction.member?.email && transaction.member?.name
+                                  ? ` (${transaction.member.email})`
+                                  : ''}
                               </>
                             ) : (
                               <>

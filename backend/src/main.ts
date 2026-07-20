@@ -17,9 +17,14 @@ async function bootstrap() {
   app.use(helmet());
   app.use(compression());
   
-  // CORS - Optimized to reduce preflight requests
+  // CORS — supports a single origin or comma-separated list (desktop + LAN mobile)
+  const corsOriginRaw = process.env.CORS_ORIGIN || 'http://localhost:3100';
+  const corsOrigins = corsOriginRaw
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3100',
+    origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],

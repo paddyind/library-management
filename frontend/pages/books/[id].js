@@ -363,15 +363,28 @@ function BookDetailsPage() {
                 <p className="text-2xl text-gray-600 mb-4">by {book.author}</p>
                 <div className="flex items-center gap-4 mb-4">
                   <span className="text-sm text-gray-500">ISBN: {book.isbn || 'N/A'}</span>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    book.borrowedByMe || book.status === 'with_me'
-                      ? 'bg-blue-100 text-blue-800'
-                      : isBookAvailable(book)
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {bookAvailabilityLabel(book, { borrowedByMe: book.borrowedByMe })}
-                  </span>
+                  {(() => {
+                    const borrowedByMe = Boolean(
+                      book.borrowedByMe ||
+                      book.status === 'with_me' ||
+                      activeLoans.some(
+                        (t) =>
+                          t.bookId === book.id &&
+                          (t.status === 'active' || t.status === 'pending_return_approval'),
+                      ),
+                    );
+                    return (
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        borrowedByMe
+                          ? 'bg-blue-100 text-blue-800'
+                          : isBookAvailable(book)
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {bookAvailabilityLabel(book, { borrowedByMe })}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-2 mb-6">
                   <div className="flex items-center">
@@ -382,21 +395,39 @@ function BookDetailsPage() {
                   </span>
                   <span className="text-sm text-gray-500">({reviews.length} {reviews.length === 1 ? 'review' : 'reviews'})</span>
                 </div>
-                {user && isMember(user) && (
+                {user && isMember(user) && !isAdminOrLibrarian(user) && (
                   <div>
+                    {(() => {
+                      const borrowedByMe = Boolean(
+                        book.borrowedByMe ||
+                        book.status === 'with_me' ||
+                        activeLoans.some(
+                          (t) =>
+                            t.bookId === book.id &&
+                            (t.status === 'active' || t.status === 'pending_return_approval'),
+                        ),
+                      );
+                      const cannotBorrow =
+                        borrowing ||
+                        borrowedByMe ||
+                        !isBookAvailable(book) ||
+                        activeLoans.length >= maxConcurrentLoans;
+                      return (
                     <button
                       onClick={handleBorrow}
-                      disabled={borrowing || book.borrowedByMe || book.status === 'with_me' || !isBookAvailable(book) || activeLoans.length >= maxConcurrentLoans}
+                      disabled={cannotBorrow}
                       className={`font-semibold py-3 px-6 rounded-lg transition-colors duration-200 ${
                         borrowing
                           ? 'bg-indigo-400 text-white cursor-wait'
-                          : book.borrowedByMe || book.status === 'with_me' || !isBookAvailable(book) || activeLoans.length >= maxConcurrentLoans
+                          : cannotBorrow
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                       }`}
                     >
                       {borrowing ? 'Borrowing...' : activeLoans.length >= maxConcurrentLoans ? `Loan Limit Reached (${activeLoans.length}/${maxConcurrentLoans})` : 'Borrow This Book'}
                     </button>
+                      );
+                    })()}
                     {activeLoans.length >= maxConcurrentLoans && (
                       <p className="mt-2 text-sm text-red-600">
                         You have reached your loan limit. Please return a book before borrowing another.

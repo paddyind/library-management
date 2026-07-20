@@ -15,6 +15,9 @@ Next.js :3300  ──OIDC──►  identity-platform Keycloak :3510  (realm: li
 | IAM | Workspace [identity-platform](../identity-platform) — realm `library`, port **3510** |
 | Data | Firebase `personal-apps-dev` / `personal-apps-prod` + `library__*` collections |
 | API | NestJS — Keycloak JWKS validation (`AppAuthGuard`) + Firebase Admin SDK |
+| Users | Settings CRUD syncs to Keycloak Admin API; JWT roles mirrored to Firestore profiles |
+| Groups | App Firestore only — not Keycloak groups |
+| Mobile | Capacitor shell (`mobile/`) loads Next.js via `server.url`; LAN vs public endpoints in `env.build` |
 | Optional legacy | SQLite when `DATA_STORAGE=legacy` + `IAM_PROVIDER=legacy` |
 
 ## Feature flags

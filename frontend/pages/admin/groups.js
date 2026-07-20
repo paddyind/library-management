@@ -173,7 +173,18 @@ function GroupsPage() {
 
           {/* Groups Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {groups.map((group) => (
+            {groups.map((group) => {
+              let permissions = [];
+              try {
+                if (typeof group.permissions === 'string') {
+                  permissions = JSON.parse(group.permissions);
+                } else if (Array.isArray(group.permissions)) {
+                  permissions = group.permissions;
+                }
+              } catch {
+                permissions = [];
+              }
+              return (
               <div key={group.id} className="bg-white shadow rounded-lg overflow-hidden">
                 <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
                   <h3 className="text-lg font-medium text-gray-900">{group.name}</h3>
@@ -182,8 +193,8 @@ function GroupsPage() {
                 <div className="px-6 py-4">
                   <h4 className="text-sm font-medium text-gray-700 mb-2">Permissions:</h4>
                   <div className="flex flex-wrap gap-2">
-                    {group.permissions && group.permissions.length > 0 ? (
-                      group.permissions.map((perm) => (
+                    {permissions.length > 0 ? (
+                      permissions.map((perm) => (
                         <span
                           key={perm}
                           className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
@@ -205,7 +216,7 @@ function GroupsPage() {
                 </div>
                 <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3">
                   <button
-                    onClick={() => handleEdit(group)}
+                    onClick={() => handleEdit({ ...group, permissions })}
                     className="text-sm text-primary-600 hover:text-primary-900 font-medium"
                   >
                     Edit
@@ -218,7 +229,8 @@ function GroupsPage() {
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           {groups.length === 0 && (

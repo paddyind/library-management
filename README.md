@@ -15,41 +15,39 @@ A modern, full-stack library management system with **anonymous book browsing** 
 - Reviews and ratings with admin approval
 - Groups, reservations, book requests
 - Role-based access (`admin`, `librarian`, `member`) via Keycloak realm roles
+- Settings → Users syncs create/update/delete + roles to Keycloak; Groups are app-only
+- Capacitor mobile shell (Android / iOS) for local Docker or public endpoint testing
 
 ---
 
-## Quick Start
+## Quick Start (desktop)
 
 ### Prerequisites
 
 - Docker Compose
 - Ports **3300** (frontend), **3301** (API), **3510** (Keycloak)
 - [identity-platform](https://github.com/paddyind/identity-platform) for IAM
-- Firebase `personal-apps-dev` service account at `../identity-platform/secrets/firebase-dev.json`
+- Firebase service account at `../identity-platform/secrets/firebase-dev.json`
 
 ### Run
 
 ```bash
-# 1. Keycloak
+# 1. Keycloak (+ optional observability)
 cd ../identity-platform && docker compose up -d
+# Optional: cd ../observability-platform && docker compose up -d
 
 # 2. Library app
 cd ../library-management
-cp .env.example .env
-# Set IAM_PROVIDER=keycloak and DATA_STORAGE=firebase (see .env.example)
-
+cp .env.example .env   # IAM_PROVIDER=keycloak, DATA_STORAGE=firebase
 docker compose up -d
 ```
 
-- App: http://localhost:3300  
-- API: http://localhost:3301/api  
-- Login: http://localhost:3300/login → **Sign in with Keycloak**  
-- Status: http://localhost:3301/api/platform/status  
-
-```bash
-# Optional Firestore seed
-docker compose exec backend npm run db:seed:firestore
-```
+| URL | Purpose |
+|-----|---------|
+| http://localhost:3300 | App |
+| http://localhost:3301/api | API |
+| http://localhost:3300/login | Keycloak sign-in |
+| http://localhost:23001 | Grafana (if observability is up) |
 
 ---
 
@@ -66,9 +64,42 @@ Next.js :3300 ──OIDC──► Keycloak :3510 (realm library)   ← identity-
 | `IAM_PROVIDER` | `keycloak` \| `legacy` | OIDC vs custom JWT |
 | `DATA_STORAGE` | `firebase` \| `legacy` | Firestore vs SQLite |
 
-**Keycloak is not part of this compose.** Shared IAM: [identity-platform](https://github.com/paddyind/identity-platform) · onboard other apps: [ONBOARDING.md](../identity-platform/docs/ONBOARDING.md)
+**Keycloak is not in this compose.** Onboard other apps: [identity-platform ONBOARDING](../identity-platform/docs/ONBOARDING.md).
 
-Docs: [ARCHITECTURE.md](ARCHITECTURE.md) · [DATABASE.md](DATABASE.md) · [docs/firestore_collections.md](docs/firestore_collections.md) · [keycloak/README.md](keycloak/README.md)
+---
+
+## Mobile (local Docker → then public)
+
+Photo-booth–style **local** testing: phone/tablet talks to Docker on your LAN (frontend, API, Keycloak login). Same Capacitor shell later points at **public** HTTPS for pre-external validation.
+
+```bash
+# One shot: LAN Keycloak + library + Capacitor sync
+./scripts/run-mobile-local.sh
+
+# When done with phone testing (restore localhost Keycloak hostname)
+./scripts/stop-mobile-local.sh
+```
+
+| Piece | Path |
+|-------|------|
+| Full guide | [mobile/BUILD.md](mobile/BUILD.md) |
+| Capacitor app | [`mobile/`](mobile/) |
+| CI (APK + iOS sim / IPA) | [`.github/workflows/mobile-build.yml`](.github/workflows/mobile-build.yml) |
+
+CI: Actions → **Mobile Build (APK + iOS)** → download artifacts → install on device / simulator.
+
+---
+
+## Docs map
+
+| Doc | Topic |
+|-----|-------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Stack overview |
+| [DATABASE.md](DATABASE.md) / [docs/firestore_collections.md](docs/firestore_collections.md) | Data |
+| [keycloak/README.md](keycloak/README.md) | IAM consumer notes |
+| [OBSERVABILITY.md](OBSERVABILITY.md) | Grafana / probes |
+| [mobile/BUILD.md](mobile/BUILD.md) | Android / iOS local & public |
+| [TECH-MIGRATION.md](TECH-MIGRATION.md) | Supabase → Keycloak/Firestore |
 
 ---
 
@@ -76,9 +107,8 @@ Docs: [ARCHITECTURE.md](ARCHITECTURE.md) · [DATABASE.md](DATABASE.md) · [docs/
 
 ```bash
 docker compose exec backend npm run db:backup
-docker compose exec backend npm run migrate:keycloak-firestore -- --dry-run
-docker compose exec backend npm run migrate:keycloak-firestore
 curl http://localhost:3301/api/platform/status
+./scripts/lan-ip.sh
 ```
 
 ---

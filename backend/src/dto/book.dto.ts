@@ -1,4 +1,16 @@
-import { IsString, IsOptional, IsArray, IsISBN, IsUUID } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsISBN,
+  IsUUID,
+  IsInt,
+  IsNumber,
+  IsBoolean,
+  IsIn,
+  Min,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateBookDto {
   @IsString()
@@ -23,6 +35,26 @@ export class CreateBookDto {
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  count?: number;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  forSale?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  price?: number;
 }
 
 export class UpdateBookDto {
@@ -52,8 +84,26 @@ export class UpdateBookDto {
   tags?: string[];
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  count?: number;
+
+  /** Accept Title Case or lowercase; service normalizes to BookStatus. */
+  @IsOptional()
   @IsString()
-  status?: 'available' | 'lent' | 'unavailable';
+  @IsIn(['available', 'Available', 'borrowed', 'Borrowed', 'reserved', 'Reserved', 'new', 'New', 'damaged', 'Damaged', 'lent', 'unavailable'])
+  status?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  forSale?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  price?: number;
 }
 
 export class LendBookDto {

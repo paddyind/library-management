@@ -11,10 +11,14 @@ There is **no** Keycloak service in this repo’s `docker-compose.yml`.
 | Library realm | `identity-platform/realms/library-realm.json` |
 | **Onboard another app** | [identity-platform/docs/ONBOARDING.md](../../identity-platform/docs/ONBOARDING.md) |
 | Architecture | [identity-platform/docs/ARCHITECTURE.md](../../identity-platform/docs/ARCHITECTURE.md) |
+| **Phone / tablet local testing** | [mobile/BUILD.md](../mobile/BUILD.md) · `../scripts/run-mobile-local.sh` |
 
 ```bash
 cd ../identity-platform && docker compose up -d
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3510/realms/library
+
+# Mobile LAN (JWT iss + redirects) — prefer library script:
+cd ../library-management && ./scripts/run-mobile-local.sh
 ```
 
 If Docker Desktop still lists `library-management-keycloak*`, remove orphans:

@@ -1,20 +1,34 @@
 # Observability for library-management
 
-## Baseline (works without code changes)
-The shared `observability-platform` stack monitors service health via **blackbox probes**, container health via **cAdvisor**, and **container logs** via **Promtail → Loki** (no app code).
+Shared stack: **observability-platform** (`obs_net`). Start it before library / identity if you want Grafana probes.
 
-No `/metrics` or OTLP instrumentation is required for this baseline. Filter logs in Grafana with LogQL, e.g. `{container=~"library-management-.*"}`. Default Docker host ports: UI **`3300`**, API **`3301`** (`LIBRARY_HOST_*` in `.env`).
+## Baseline (no app code)
 
-## What you already have
-`library-management/docker-compose.yml` was updated to attach containers to the shared Docker network `obs_net` and to include OpenTelemetry env vars (for traces/logs if the app is instrumented).
+| Signal | Where |
+|--------|-------|
+| HTTP up / latency | Grafana → **Service Health** (`library-management-*`, `identity-platform-*`) |
+| CPU / memory | **Container CPU, Memory, Restarts** |
+| Logs | `{container=~"library-management-.*|identity-platform-.*"}` |
 
-## How to verify
-1. Start `observability-platform` (Grafana `http://localhost:23001`; see `observability-platform/docs/ARCHITECTURE.md`).
-2. Start `library-management` with Docker Compose.
-3. In Grafana, open **Service Health, Latency, Error Rate** and check for:
-   - `library-management-backend`
-   - `library-management-frontend`
+## Bring-up
 
-## Next level (distributed traces + OTLP logs)
-**Promtail** already provides container logs in Loki. For trace IDs in logs and Tempo **distributed traces**, the app must emit OTLP telemetry (compose env vars are not enough without instrumentation).
+```bash
+cd ../observability-platform && docker compose up -d
+cd ../identity-platform && docker compose up -d
+cd ../library-management && docker compose up -d
+```
 
+| Tool | URL |
+|------|-----|
+| Grafana | http://localhost:23001 (`admin` / `admin`) |
+| Prometheus | http://localhost:23090 |
+
+Keycloak metrics/health: see [identity-platform/OBSERVABILITY.md](../identity-platform/OBSERVABILITY.md).
+
+## Mobile note
+
+Local phone testing uses LAN URLs (`scripts/run-mobile-local.sh`). Observability still scrapes **container DNS** on `obs_net` (unchanged). Host Grafana stays on localhost.
+
+## Traces (optional)
+
+Compose sets OTEL env vars; Nest/Next need SDK instrumentation for Tempo traces. Promtail already ships container logs.
