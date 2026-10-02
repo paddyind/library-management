@@ -84,3 +84,6 @@ mobile/node_modules/
 # Uploads
 uploads/
 public/uploads/
+
+# Real credentials - never commit (template: .env.example)
+.env.production
